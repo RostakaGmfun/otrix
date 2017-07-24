@@ -10,7 +10,7 @@ clean:
 	rm -r build
 
 run: $(iso)
-	kvm -cdrom $(iso)
+	qemu-kvm -cdrom $(iso)
 
 $(iso): $(kernel)
 	mkdir -p build/isofiles/boot/grub

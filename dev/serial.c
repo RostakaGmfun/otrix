@@ -5,8 +5,8 @@
 
 struct serial_dev
 {
-    serial_com_port com_port;
-    serial_baud_rate baud;
+    enum serial_com_port com_port;
+    enum serial_baud_rate baud;
 };
 
 enum serial_registers
@@ -42,8 +42,8 @@ static void serial_set_baud(const struct serial_dev *self,
     line_ctl |= SERIAL_LINE_CTL_DLAB;
     arch_io_write_byte(SERIAL_LINE_CTL, line_ctl);
 
-    arch_io_write_byte(self->com_port + SERIAL_DATA, (uint16_t)baud & 0xFF);
-    arch_io_write_byte(self->com_port + SERIAL_INTEN, (uint16_t)baud & 0xFF00);
+    arch_io_write_byte(self->com_port + SERIAL_DATA, baud & 0xFF);
+    arch_io_write_byte(self->com_port + SERIAL_INTEN, baud & 0xFF00);
 
     // Disable DLAB
     line_ctl &= ~SERIAL_LINE_CTL_DLAB;
@@ -60,11 +60,11 @@ static bool serial_rx_ready(const struct serial_dev * const self)
     return arch_io_read_byte(self->com_port + SERIAL_LSR) & SERIAL_LSR_RX_READY;
 }
 
-void serial_init(struct serial_dev *serial,
-        const enum serial_baud_rate baud, const serial_com_port com_port)
+void serial_init(struct serial_dev *self,
+        const enum serial_baud_rate baud, const enum serial_com_port com_port)
 {
-    serial->com_port = com_port;
-    serial->baud = baud;
+    self->com_port = com_port;
+    self->baud = baud;
 
     arch_io_write_byte(self->com_port + SERIAL_DATA, 0x00); // Disable all interrupts
     serial_set_baud(self, baud);
@@ -76,7 +76,7 @@ void serial_init(struct serial_dev *serial,
     arch_io_write_byte(SERIAL_MODEM_CTL, 0x00);
 }
 
-void serial_write(const uint8_t * const data, const size_t data_size)
+void serial_write(const struct serial_dev * self, const uint8_t * const data, const size_t data_size)
 {
     for (size_t i = 0; i < data_size; i++) {
         while (!serial_tx_ready(self));
@@ -84,7 +84,8 @@ void serial_write(const uint8_t * const data, const size_t data_size)
     }
 }
 
-void serial_read(uint8_t * const buffer, const size_t buffer_size)
+void serial_read(const struct serial_dev *self,
+        uint8_t * const buffer, const size_t buffer_size)
 {
     for (size_t i = 0; i < buffer_size; i++) {
         while (!serial_rx_ready(self));
