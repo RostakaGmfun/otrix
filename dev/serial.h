@@ -17,7 +17,11 @@ enum serial_com_port
     SERIAL_COM4 = 0x2E8,
 };
 
-struct serial_dev;
+struct serial_dev
+{
+    enum serial_baud_rate baud;
+    enum serial_com_port com_port;
+};
 
 /**
  * Initialize serial device

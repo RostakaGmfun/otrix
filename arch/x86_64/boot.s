@@ -1,8 +1,31 @@
+.section .multiboot_header
+header_start:
+    // magic number (multiboot 2)
+    .long 0xe85250d6
+    // architecture 0 (protected mode i386)
+    .long 0
+    // header length
+    .long header_end - header_start
+    // checksum
+    .long -(0xe85250d6 + 0 + (header_end - header_start))
+
+    // insert optional multiboot tags here
+
+    // required end tag
+    // type
+    .short 0
+    // flags
+    .short 0
+    // size
+    .long 8
+header_end:
+
+.extern kmain
 .section .text
 .code32
 .global start
 start:
-    mov stack_top, %esp
+    mov $stack_top, %esp
 
     call check_multiboot
     call check_cpuid
@@ -11,16 +34,15 @@ start:
     call set_up_page_tables
     call enable_paging
 
-    // print `OK` to screen
-    movl $0x2f4b2f4f, 0xb8000
-    hlt
+    lgdt gdt64_pointer
+    ljmp $0x08, $long_mode_start
 
 check_multiboot:
     cmpl $0x36d76289, %eax
     jne .no_multiboot
     ret
 .no_multiboot:
-    mov '0', %al
+    mov $'0', %al
     jmp error
 
 check_cpuid:
@@ -35,7 +57,7 @@ check_cpuid:
     mov %eax, %ecx
 
     // Flip the ID bit
-    xor %eax, 1 << 21
+    xor $(1 << 21), %eax
 
     // Copy EAX to FLAGS via the stack
     push %eax
@@ -56,7 +78,7 @@ check_cpuid:
     je .no_cpuid
     ret
 .no_cpuid:
-    mov '1', %al
+    mov $'1', %al
     jmp error
 
 check_long_mode:
@@ -73,7 +95,7 @@ check_long_mode:
     // use extended info to test if long mode is available
     movl $0x80000001, %eax
     cpuid
-    testl %edx, 1 << 29
+    testl $(1 << 29), %edx
     jz .no_long_mode
     ret
 .no_long_mode:
@@ -105,8 +127,8 @@ set_up_page_tables:
     // present + writable + huge
     or $0b10000011, %eax
     // map ecx-th entry
-    movl $p2_table, %edx
-    movl %eax, (%edx,%ecx,8)
+    mov $p2_table, %edi
+    mov %eax, (%edi,%ecx,8)
 
     inc %ecx
     // if counter == 512, the whole P2 table is mapped
@@ -123,18 +145,18 @@ enable_paging:
 
     // enable PAE-flag in cr4 (Physical Address Extension)
     movl  %cr4, %eax
-    or 1 << 5, %eax
+    or $(1 << 5), %eax
     movl %eax, %cr4
 
     // set the long mode bit in the EFER MSR (model specific register)
     movl $0xC0000080, %ecx
     rdmsr
-    or 1 << 8, %eax
+    or $(1 << 8), %eax
     wrmsr
 
     // enable paging in the cr0 register
     movl %cr0, %eax
-    or 1 << 31, %eax
+    or $(1 << 31), %eax
     movl %eax, %cr0
 
     ret
@@ -157,5 +179,23 @@ p3_table:
 p2_table:
     .space 4096
 stack_bottom:
-    .space 64
+    .space 1024
 stack_top:
+.section .rodata
+gdt64:
+    // zero entry
+    .quad 0
+.code:
+    // code
+    .quad (1<<43) | (1<<44) | (1<<47) | (1<<53)
+gdt64_pointer:
+    .hword gdt64_pointer - gdt64 - 1
+    .quad gdt64
+
+.section .text
+.code64
+long_mode_start:
+    cli
+    mov $0x2f592f412f4b2f4f, %rax
+    mov %rax, 0xb8000
+    call kmain
