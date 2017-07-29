@@ -11,8 +11,8 @@ add_library(otrix_x86_64 ${CMAKE_CURRENT_LIST_DIR}/arch/x86_64/multiboot.s
 target_link_libraries(otrix_x86_64 -T${CMAKE_CURRENT_LIST_DIR}/arch/x86_64/linker.ld)
 target_include_directories(otrix_x86_64 PUBLIC ${CMAKE_CURRENT_LIST_DIR}/arch/x86_64/include/)
 
-add_library(otrix_dev ${CMAKE_CURRENT_LIST_DIR}/dev/serial.c)
-target_include_directories(otrix_dev PUBLIC ${CMAKE_CURRENT_LIST_DIR}/dev/)
+add_library(otrix_dev ${CMAKE_CURRENT_LIST_DIR}/dev/serial.c ${CMAKE_CURRENT_LIST_DIR}/dev/pci.c)
+target_include_directories(otrix_dev PUBLIC ${CMAKE_CURRENT_LIST_DIR}/dev/ ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(otrix_dev otrix_x86_64)
 
 add_executable(otrix_kernel kernel/kmain.c)
