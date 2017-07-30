@@ -31,7 +31,7 @@ struct pci_device
 };
 
 /**
- * Find PCI device by Device ID.
+ * Find PCI device by Device ID and Vendor ID.
  *
  * @param device_id[in] Device ID of PCI device to find.
  * @param device_id[in] Vendor ID of PCI device to find.
@@ -49,10 +49,9 @@ error_t pci_find_device(const uint16_t device_id, const uint16_t vendor_id,
  * @param device[in] PCI device to read the capability for.
  * @param cap_id[in] Device capability to read.
  * @param buffer[out] Buffer to write capability data to.
- * @param size[in] Size of @c buffer in bytes.
+ * @param size[in] Number of bytes to read (starting right after the @c next pointer).
  *
  * @retval EINVAL Capability no present in given device.
- * @retval ENOMEM Insufficient buffer size.
  */
 error_t pci_read_capability(const struct pci_device * const device,
         const uint8_t cap_id, uint8_t * const buffer, const size_t size);
