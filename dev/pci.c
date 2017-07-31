@@ -39,6 +39,9 @@ enum pci_registers
     PCI_REG_SUBSYSTEM_ID = 0x2C,
     PCI_REG_BAR0 = 0x10,
     PCI_REG_BAR1 = 0x14,
+#define PCI_REG_SUBSYS_ID(ret) ((reg & 0xFFFF0000) >> 16)
+#define PCI_REG_SUBSYS_VENDOR_ID(ret) ((reg & 0x0000FFFF))
+    PCI_REG_SUBSYSTEM = 0x2C,
 #define PCI_REG_GET_CAP_PTR(reg) (reg & 0x000000FF)
     PCI_REG_CAP_PTR = 0x34,
 #define PCI_REG_INT_PIN(reg) ((reg & 0x0000FF00) >> 8)
@@ -169,6 +172,11 @@ static error_t pci_read_device_config(struct pci_device * const device)
                     device->function, PCI_REG_STATUS_COMMAND);
     device->status = PCI_REG_STATUS(reg);
     device->command = PCI_REG_COMMAND(reg);
+
+    reg = pci_config_read32(device->bus_no, device->dev_no,
+                    device->function, PCI_REG_SUBSYSTEM);
+    device->subsystem_id = PCI_REG_SUBSYSTEM_ID(reg);
+    device->subsystem_vendor_id = PCI_REG_SUBSYSTEM_VENDOR_ID(reg);
 
     if (device->status & PCI_REG_STATUS_CAPLIST) {
         device->cap_ptr = PCI_REG_GET_CAP_PTR(pci_config_read32(device->bus_no,

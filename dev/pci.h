@@ -25,6 +25,8 @@ struct pci_device
     uint8_t class;
     uint8_t subclass;
     uint8_t revision_id;
+    uint16_t subsystem_id;
+    uint16_t subsystem_vendor_id;
     uint64_t BAR0;
     uint8_t cap_ptr;
     struct pci_capability capabilities[PCI_CFG_NUM_CAPABILITIES];
