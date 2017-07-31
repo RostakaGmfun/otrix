@@ -69,11 +69,55 @@ static inline uint32_t pci_config_read32(const uint8_t bus, const uint8_t dev,
 static inline uint8_t pci_config_read8(const uint8_t bus, const uint8_t dev,
         const uint8_t fun, uint8_t addr)
 {
-    uint8_t aligned_addr = addr & 0x03;
+    uint8_t aligned_addr = addr & (~0x03);
 
     uint32_t data = pci_config_read32(bus, dev, fun, aligned_addr);
-    return (data >> (addr & 0x03)) & 0xFF;
+    return (data >> ((addr & 0x03) * 8)) & 0xFF;
 }
+
+/**
+ * Read @c size number of bytes from possibly unaligned address
+ * of PCI configuration space.
+ *
+ * Attempts to perform as much of aligned 4-byte reads as possible.
+ *
+ * @retval EINVAL Requested read size goes out of bounds
+ *                of the 256-byte Configuration space.
+ */
+static inline error_t pci_config_read_buffer(const uint8_t bus,
+        const uint8_t dev, const uint8_t fun, const uint8_t addr,
+        uint8_t *buffer, const size_t size)
+{
+    if (size - addr > 0xFF) {
+        return EINVAL;
+    }
+
+    uint8_t aligned_addr = addr & (~0x03);
+    if (aligned_addr != addr) {
+        const uint32_t first_word = pci_config_read32(bus, dev, fun, aligned_addr);
+        for (int i = (addr & 0x03); i < 0x03; i++) {
+            *buffer++ =  (first_word >> (i * 8)) & 0xFF;
+        }
+    }
+
+    aligned_addr += 4;
+
+    for (int i = 0; i < size / 4; i++) {
+        *((uint32_t *)buffer) = pci_config_read32(bus, dev, fun, aligned_addr);
+        buffer += 4;
+        aligned_addr += 4;
+    }
+
+    if (size % 4 != 0) {
+        const uint32_t last_word = pci_config_read32(bus, dev, fun, aligned_addr);
+        for (int i = 0; i < size % 4; i++) {
+            *buffer++ = (last_word >> (i * 8)) & 0xFF;
+        }
+
+    }
+    return EOK;
+}
+
 
 /**
  * Read the PCI device capabilities list into the internal\
@@ -115,9 +159,11 @@ static error_t pci_read_device_config(struct pci_device * const device)
     device->subclass = PCI_REG_SUBCLASS(reg);
     device->revision_id = PCI_REG_REVISION_ID(reg);
 
-    reg = pci_config_read32(device->bus_no, device->dev_no, device->function, PCI_REG_BAR0);
-    device->BAR0 = ((uint64_t)reg << 32) | pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR1);
+    // Read 64-bit BAR0
+    reg = pci_config_read32(device->bus_no, device->dev_no,
+            device->function, PCI_REG_BAR0);
+    device->BAR0 = ((uint64_t)reg << 32) | pci_config_read32(device->bus_no,
+            device->dev_no, device->function, PCI_REG_BAR1);
 
     reg = pci_config_read32(device->bus_no, device->dev_no,
                     device->function, PCI_REG_STATUS_COMMAND);
@@ -125,8 +171,8 @@ static error_t pci_read_device_config(struct pci_device * const device)
     device->command = PCI_REG_COMMAND(reg);
 
     if (device->status & PCI_REG_STATUS_CAPLIST) {
-        device->cap_ptr = PCI_REG_GET_CAP_PTR(pci_config_read32(device->bus_no, device->dev_no,
-                        device->function, PCI_REG_CAP_PTR));
+        device->cap_ptr = PCI_REG_GET_CAP_PTR(pci_config_read32(device->bus_no,
+                        device->dev_no, device->function, PCI_REG_CAP_PTR));
 
         return pci_read_device_capabilities(device);
     } else {
@@ -163,8 +209,22 @@ error_t pci_find_device(const uint16_t device_id, const uint16_t vendor_id,
 }
 
 error_t pci_read_capability(const struct pci_device * const device,
-        const uint8_t cap_id, uint8_t * const buffer, const size_t size)
+        const uint8_t cap_id, uint8_t * const buffer,
+        const size_t size)
 {
-    // TODO(RostakaGmfun)
+    if (device == NULL || buffer == NULL || size == 0) {
+        return EINVAL;
+    }
+
+    const size_t num_caps = sizeof(device->capabilities) /
+        sizeof(struct pci_capability);
+    for (int i = 0; i < num_caps; i++) {
+        if (device->capabilities[i].id == cap_id) {
+            pci_config_read_buffer(device->bus_no, device->dev_no,
+                    device->function,
+                    device->capabilities[i].offset + 2, buffer, size);
+        }
+    }
+
     return EOK;
 }
