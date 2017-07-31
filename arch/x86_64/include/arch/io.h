@@ -25,7 +25,7 @@ static inline void arch_io_write16(const uint16_t address, const uint16_t data)
     asm volatile ("out %%ax, %%dx": : "d" (address), "a" (data));
 }
 
-static inline uint16_t arch_io_read32(const uint16_t address)
+static inline uint32_t arch_io_read32(const uint16_t address)
 {
     uint32_t ret;
     asm volatile ("in %%dx, %%eax": "=a" (ret) : "d" (address));

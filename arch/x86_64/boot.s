@@ -179,7 +179,7 @@ p3_table:
 p2_table:
     .space 4096
 stack_bottom:
-    .space 1024
+    .space 1024 * 16
 stack_top:
 .section .rodata
 gdt64:
