@@ -1,4 +1,4 @@
-#include "pci.h"
+#include "dev/pci.h"
 #include "arch/io.h"
 
 #define PCI_CFG_ADDR 0xCF8

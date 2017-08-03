@@ -1,5 +1,5 @@
-#include "serial.h"
-#include "pci.h"
+#include "dev/serial.h"
+#include "dev/pci.h"
 
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
@@ -8,19 +8,18 @@
 static const struct
 {
     const char *name;
-    uint16_t subsystem_id;
 } virtio_pci_devices[] = {
     {
         .name = "VirtIO Net",
-        .subsystem_id = 0x01,
     },
     {
         .name = "VirtIO Block",
-        .subsystem_id = 2,
+    },
+    {
+        .name = "VirtIO Membaloon",
     },
     {
         .name = "VirtIO Console",
-        .subsystem_id = 3,
     },
 
 };
@@ -48,8 +47,9 @@ __attribute__((noreturn)) void kmain()
     for (uint16_t i = VIRTIO_DEVICE_MIN_ID;
          i < VIRTIO_DEVICE_MAX_ID; i++) {
         if (pci_find_device(i, VIRTIO_VENDOR_ID, &dev) != ENODEV) {
-            if (dev.subsystem_id <= 3) {
-                print(virtio_pci_devices[dev.subsystem_id].name);
+            int dev_id = i - VIRTIO_DEVICE_MIN_ID;
+            if (dev_id < sizeof(virtio_pci_devices)/sizeof(virtio_pci_devices[0])) {
+                print(virtio_pci_devices[dev_id].name);
             }
         }
     }

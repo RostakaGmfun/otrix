@@ -1,4 +1,4 @@
-#include "serial.h"
+#include "dev/serial.h"
 #include <stdbool.h>
 
 #include "arch/io.h"

@@ -1,7 +1,7 @@
 #ifndef OTRIX_PCI_H
 #define OTRIX_PCI_H
 
-#include "kernel/error.h"
+#include "common/error.h"
 #include <stdint.h>
 #include <stddef.h>
 
