@@ -22,5 +22,20 @@ arch_context_save:
 
 .global arch_context_restore
 arch_context_restore:
-    // TODO
+    mov 8(%esp), %rax
+    mov (%rax), %rbx
+    mov 8(%rax), %r8
+    mov 16(%rax), %r9
+    mov 24(%rax), %r10
+    mov 32(%rax), %r11
+    mov 40(%rax), %r12
+    mov 48(%rax), %r13
+    mov 56(%rax), %r14
+    mov 64(%rax), %r15
+    mov 72(%rax), %rsi
+    mov 80(%rax), %rdi
+    mov 88(%rax), %rdx
+    push %rdx
+    popfq
+    mov 96(%rax), %rsp
     ret
