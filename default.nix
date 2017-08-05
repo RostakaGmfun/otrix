@@ -1,9 +1,13 @@
 { pkgs ? import <nixpkgs> { } }:
-    with pkgs; stdenv.mkDerivation {
+let
+    unity = pkgs.callPackage ./nix/unity.nix {};
+in with pkgs; stdenv.mkDerivation {
         name = "otrix";
         src = ../otrix;
-        buildInputs = [cmake gcc nasm grub2 xorriso kvm];
+        buildInputs = [cmake gcc nasm grub2 xorriso kvm unity];
         fixupPhase = " ";
+        doCheck = true;
+        checkTarget = "test";
         postInstall = ''
             echo "Verifying if binary conforms GRUB Multiboot2"
             grub-file --is-x86-multiboot2 $out/bin/otrix_kernel

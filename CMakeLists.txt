@@ -3,8 +3,11 @@ cmake_minimum_required(VERSION 3.0.2)
 project(otrix C ASM)
 
 set(TARGET_ARCH x86_64)
+SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -nostdlib -ffreestanding -nodefaultlibs -fPIC -O0")
+enable_testing()
+
+set(KERNEL_C_FLAGS -ffreestanding -fPIC -O0)
 
 add_subdirectory(common)
 add_subdirectory(arch/${TARGET_ARCH})

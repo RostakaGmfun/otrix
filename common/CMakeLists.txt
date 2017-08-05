@@ -1,5 +1,10 @@
 add_library(otrix_common INTERFACE)
 target_include_directories(otrix_common INTERFACE include/)
+target_link_libraries(otrix_common INTERFACE otrix_arch)
+target_compile_options(otrix_common INTERFACE ${KERNEL_C_FLAGS})
 
 # TODO(RostakaGmfun): Add Unity dependency
-# add_executable(otrix_common_test test/test_runner.c test/list_test.c)
+add_executable(intrusive_list_test test/test_runner.c test/list_test.c)
+target_include_directories(intrusive_list_test PUBLIC include/)
+target_link_libraries(intrusive_list_test unity)
+add_test(NAME intrusive_list_test COMMAND intrusive_list_test)
