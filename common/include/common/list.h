@@ -1,29 +1,31 @@
-#ifndef LIST_H_
-#define LIST_H_
+#ifndef OTRIX_INTRUSIVE_LIST_H
+#define OTRIX_INTRUSIVE_LIST_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include "common/assert.h"
 
 /**
- * @file list.t
+ * @file intrusive_list.h
  *
  * Implements circular intrusive doubly linked list list.
  */
 
-#include <stddef.h>
-#include <stdbool.h>
-#include "assert.h"
+struct intrusive_list {
+    struct intrusive_list *next;
+    struct intrusive_list *prev;
+};
 
-typedef struct list {
-    struct list *next;
-    struct list *prev;
-} list_t;
+#define intrusive_list_entry(list_ptr, struct_name, member_name) \
+    ((struct_name*)((uint8_t*)(list_ptr) - offsetof(struct_name, member_name)))
 
-#define list_entry(list_ptr, struct_name, member_name) \
-    ((struct_name*)((char*)(list_ptr) - offsetof(struct_name, member_name)))
+typedef bool (*list_predicate)(const struct intrusive_list *node,
+        void *context);
 
-typedef bool (*list_predicate)(const list_t *node, void *context);
-
-static inline list_t *list_init(list_t *node)
+static inline struct intrusive_list *intrusive_list_init(struct intrusive_list *node)
 {
-    assert(node != NULL);
+    kASSERT(node != NULL);
     node->prev = node;
     node->next = node;
     return node;
@@ -34,9 +36,9 @@ static inline list_t *list_init(list_t *node)
  *
  * @note The list is assumed to be circular.
  */
-static inline list_t *list_get_tail(list_t *head)
+static inline struct intrusive_list *intrusive_list_get_tail(struct intrusive_list *head)
 {
-    assert(head != NULL);
+    kASSERT(head != NULL);
     return head->prev;
 }
 
@@ -47,11 +49,12 @@ static inline list_t *list_get_tail(list_t *head)
  * @return Tail.
  * @retval NULL On failure.
  */
-static inline list_t *list_push_back(list_t *head, list_t *tail)
+static inline struct intrusive_list *intrusive_list_push_back(struct intrusive_list *head,
+        struct intrusive_list *tail)
 {
-    assert(head != NULL && tail != NULL);
+    kASSERT(head != NULL && tail != NULL);
 
-    list_t *last = list_get_tail(head);
+    struct intrusive_list *last = intrusive_list_get_tail(head);
 
     last->next = tail;
     tail->prev = last;
@@ -65,7 +68,7 @@ static inline list_t *list_push_back(list_t *head, list_t *tail)
  * Unlinks the given node from it's neightbours,
  * thus deleting it from the list.
  */
-static inline void list_unlink_node(list_t *node)
+static inline void intrusive_list_unlink_node(struct intrusive_list *node)
 {
     if (node == NULL) {
         return;
@@ -85,12 +88,12 @@ static inline void list_unlink_node(list_t *node)
  * @return Pointer to found node.
  * @retval NULL if node matching given predicate was not found in the list.
  */
-static inline list_t *list_find_first(list_t *head, list_predicate predicate,
-        void *context)
+static inline struct intrusive_list *intrusive_list_find_first(struct intrusive_list *head,
+        list_predicate predicate, void *context)
 {
-    assert(head != NULL && predicate != NULL);
+    kASSERT(head != NULL && predicate != NULL);
 
-    list_t *current = head;
+    struct intrusive_list *current = head;
     do {
         if (predicate(current, context)) {
             return current;
@@ -105,16 +108,17 @@ static inline list_t *list_find_first(list_t *head, list_predicate predicate,
  *
  * @retval New head of list.
  */
-static inline list_t *list_delete_first(list_t *head, list_predicate predicate,
-        void *context)
+static inline struct intrusive_list *intrusive_list_delete_first(struct intrusive_list *head,
+        list_predicate predicate, void *context)
 {
-    list_t *to_delete = list_find_first(head, predicate, context);
+    struct intrusive_list *to_delete =
+        intrusive_list_find_first(head, predicate, context);
     if (to_delete != NULL) {
         if (to_delete == head) {
             head = to_delete->next;
         }
 
-        list_unlink_node(to_delete);
+        intrusive_list_unlink_node(to_delete);
         return head;
     }
 
@@ -129,11 +133,12 @@ static inline list_t *list_delete_first(list_t *head, list_predicate predicate,
  *
  * @return Pointer to inserted node.
  */
-static inline list_t *list_insert(list_t *prev, list_t *node)
+static inline struct intrusive_list *intrusive_list_insert(struct intrusive_list *prev,
+        struct intrusive_list *node)
 {
-    assert(prev != NULL && node != NULL);
+    kASSERT(prev != NULL && node != NULL);
 
-    list_t *tmp = node->next;
+    struct intrusive_list *tmp = node->next;
     node->next = prev->next;
     if (node->next != NULL) {
         node->next->prev = node;
@@ -148,4 +153,4 @@ static inline list_t *list_insert(list_t *prev, list_t *node)
     return node;
 }
 
-#endif // INTRUSIVE_LIST_H_
+#endif // OTRIX_INTRUSIVE_LIST_H
