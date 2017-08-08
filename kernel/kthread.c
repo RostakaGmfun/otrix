@@ -19,13 +19,13 @@ static bool kthread_find_by_id_pred(const struct intrusive_list *n,
         == *(uint32_t *)id;
 }
 
-static inline void kthread_run_current()
+void kthread_run_current()
 {
     arch_context_restore(&(list_to_kthread(kthread_scheduler.current_thread)->context));
 }
 
 error_t kthread_create(struct kthread * const thread,
-        const kthread_entry_t *entry, void * const params)
+        kthread_entry_t *entry, void * const params)
 {
     if (thread == NULL || entry == NULL) {
         return EINVAL;
@@ -43,7 +43,16 @@ error_t kthread_create(struct kthread * const thread,
                 &thread->list_entry);
     }
 
+    static int t_id = 0;
+    thread->id = t_id++;
+
     return EOK;
+}
+
+void kthread_scheduler_run()
+{
+    kthread_scheduler.current_thread = kthread_scheduler.threads;
+    kthread_run_current();
 }
 
 uint32_t kthread_get_current_id(void)

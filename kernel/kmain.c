@@ -1,5 +1,6 @@
 #include "dev/serial.h"
 #include "dev/pci.h"
+#include "kernel/kthread.h"
 
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
@@ -33,9 +34,38 @@ static size_t strlen(const char *str)
     return ret;
 }
 
-static void print(const char *str)
+static struct kthread t1;
+static struct kthread t2;
+
+void print(const char *str)
 {
     serial_write(&serial, str, strlen(str));
+}
+
+static void thread1(void *param)
+{
+    print("thread1 started\n");
+    if (*(uint32_t*)param == 42) {
+        print("param is 42\n");
+    } else {
+        print("thread1 BUG ON\n");
+    }
+    kthread_yield();
+    print("thread1 after yielding\n");
+    kthread_yield();
+    print("thread1 after second yield (thread2 destroyed)\n");
+    kthread_yield();
+    print("thread1 after 3rd yield (rescheduled as a single thread)\n");
+    while (1);
+}
+
+static void thread2(void *param)
+{
+    print("thread2 started\n");
+    kthread_yield();
+    print("thread2 after yielding\n");
+    kthread_destroy(kthread_get_current_id());
+    print("BUG ON\n");
 }
 
 __attribute__((noreturn)) void kmain()
@@ -53,5 +83,16 @@ __attribute__((noreturn)) void kmain()
             }
         }
     }
+
+    print("Scan finished\n");
+
+    int p1 = 42;
+    kthread_create(&t1, thread1, &p1);
+
+    int p2 = 13;
+    kthread_create(&t2, thread2, &p2);
+
+    kthread_scheduler_run();
+
     while (1);
 }
