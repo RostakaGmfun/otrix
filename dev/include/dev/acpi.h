@@ -6,8 +6,8 @@
 /**
  * Initialize internal data and locate RSDP.
  */
-error_code_t acpi_init(void);
+error_t acpi_init(void);
 
-error_code_t acpi_get_io_apic(uint64_t *const apic_addr);
+void *acpi_get_io_apic(void);
 
 #endif // OTRIX_ACPI_H
