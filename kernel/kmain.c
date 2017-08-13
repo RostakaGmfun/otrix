@@ -1,6 +1,7 @@
 #include "dev/serial.h"
 #include "dev/pci.h"
 #include "kernel/kthread.h"
+#include "mini-printf.h"
 
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
@@ -68,8 +69,26 @@ static void thread2(void *param)
     print("BUG ON\n");
 }
 
+static void print_virtio_pci(const struct pci_device *dev)
+{
+    char strbuf[256];
+    int dev_id = dev->device_id - VIRTIO_DEVICE_MIN_ID;
+    const char *dev_name = "Unknown";
+    if (dev_id < sizeof(virtio_pci_devices)/sizeof(virtio_pci_devices[0])) {
+        dev_name = virtio_pci_devices[dev_id].name;
+    }
+
+    snprintf(strbuf, sizeof(strbuf),
+            "Found VirtIO PCI device '%s':\nBus: %d, dev:%d\ndev_id: 0x%X, revision: 0x%X\n",
+            dev_name,
+            dev->bus_no, dev->dev_no, dev->device_id,
+            dev->revision_id);
+    print(strbuf);
+}
+
 __attribute__((noreturn)) void kmain()
 {
+
     serial_init(&serial, SERIAL_BAUD_115200, SERIAL_COM1);
     print("Hello, otrix!\n");
 
@@ -77,10 +96,7 @@ __attribute__((noreturn)) void kmain()
     for (uint16_t i = VIRTIO_DEVICE_MIN_ID;
          i < VIRTIO_DEVICE_MAX_ID; i++) {
         if (pci_find_device(i, VIRTIO_VENDOR_ID, &dev) != ENODEV) {
-            int dev_id = i - VIRTIO_DEVICE_MIN_ID;
-            if (dev_id < sizeof(virtio_pci_devices)/sizeof(virtio_pci_devices[0])) {
-                print(virtio_pci_devices[dev_id].name);
-            }
+            print_virtio_pci(&dev);
         }
     }
 
