@@ -1,12 +1,17 @@
 #include "dev/serial.h"
-#include "dev/pci.h"
-#include "kernel/kthread.h"
+//#include "dev/pci.h"
+//#include "kernel/kthread.h"
 #include "mini-printf.h"
+// TODO(RostakaGMfun): Provide patch for mini-printf
+#undef snprintf
+#undef vsnprintf
+//#include "kernel/kthread.hpp"
 
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
 #define VIRTIO_DEVICE_MAX_ID 0x103F
 
+/*
 static const struct
 {
     const char *name;
@@ -26,22 +31,9 @@ static const struct
 
 };
 
-static struct serial_dev serial;
-
-static size_t strlen(const char *str)
-{
-    size_t ret = 0;
-    while (*str++) ret++;
-    return ret;
-}
 
 static struct kthread t1;
 static struct kthread t2;
-
-void print(const char *str)
-{
-    serial_write(&serial, str, strlen(str));
-}
 
 static void thread1(void *param)
 {
@@ -85,12 +77,29 @@ static void print_virtio_pci(const struct pci_device *dev)
             dev->revision_id);
     print(strbuf);
 }
+*/
+
+static size_t strlen(const char *str)
+{
+    size_t ret = 0;
+    while (*str++) ret++;
+    return ret;
+}
+
+static serial_dev serial;
+
+void print(const char *str)
+{
+    serial_write(&serial, (const uint8_t *)str, strlen(str));
+}
+
+extern "C" {
 
 __attribute__((noreturn)) void kmain()
 {
-
     serial_init(&serial, SERIAL_BAUD_115200, SERIAL_COM1);
     print("Hello, otrix!\n");
+    /*
 
     struct pci_device dev;
     for (uint16_t i = VIRTIO_DEVICE_MIN_ID;
@@ -109,6 +118,8 @@ __attribute__((noreturn)) void kmain()
     kthread_create(&t2, thread2, &p2);
 
     kthread_scheduler_run();
-
+    */
     while (1);
+}
+
 }

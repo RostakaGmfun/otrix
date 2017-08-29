@@ -8,7 +8,8 @@ SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
 enable_testing()
 
 set(KERNEL_C_FLAGS -ffreestanding -fPIC -O0)
-set(KERNEL_CXX_FLAGS -fno-exceptions -fno-unwind-tables -nostdlib -no-rtti)
+set(KERNEL_CXX_FLAGS -fno-exceptions -fno-unwind-tables
+  -nostdlib -fno-rtti -std=c++17 -static)
 
 add_subdirectory(common)
 add_subdirectory(arch/${TARGET_ARCH})

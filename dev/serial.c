@@ -3,6 +3,10 @@
 
 #include "arch/io.h"
 
+#ifdef __cplusplus
+extern "C" {
+    #endif
+
 enum serial_registers
 {
     SERIAL_DATA, // Budrate divider low byte when DLAB == 1
@@ -85,3 +89,7 @@ void serial_read(const struct serial_dev *self,
         buffer[i] = arch_io_read8(self->com_port + SERIAL_DATA);
     }
 }
+
+#ifdef __cplusplus
+}
+#endif

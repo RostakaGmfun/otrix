@@ -16,6 +16,7 @@ in
   in with pkgs; stdenv.mkDerivation {
     name = "otrix";
     src = ../otrix;
+    hardeningDisable = ["stackprotector"];
     buildInputs = [cmake gcc nasm grub2 xorriso kvm unity mini-printf];
     fixupPhase = " ";
     doCheck = true;

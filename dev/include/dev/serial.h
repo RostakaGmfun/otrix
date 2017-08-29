@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum serial_baud_rate
 {
     SERIAL_BAUD_115200 = 0x0001,
@@ -59,5 +63,9 @@ static inline void serial_put(const struct serial_dev *self,
 {
     serial_write(self, &byte, sizeof(byte));
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // DEV_SERIAL_H

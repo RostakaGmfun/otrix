@@ -3,16 +3,20 @@
 
 #include <cstddef>
 #include <type_traits>
+#include <array>
+#include <experimental/optional>
 
 #include "common/error.hpp"
-#include "arch/common.hpp"
 #include "arch/context.h"
 
 namespace otrix
 {
 
+template <typename T>
+using optional_t = std::experimental::optional<T>;
+
 // TODO(RostakaGmfun): Add more type safety
-using kthread_entry = (void)(*)(void *);
+using kthread_entry = void(*)(void *);
 
 /**
  * Represents a single-core kernel cooperating threads (fibers).
@@ -20,22 +24,15 @@ using kthread_entry = (void)(*)(void *);
 class kthread
 {
 public:
-    kthread(kthread_entry &&entry): entry_(entry)
-    {
-        arch_context_setup(&context_, &stack_,
-                &stack_, entry_, nullptr);
-    }
-
+    kthread();
+    kthread(kthread_entry entry, uint64_t *stack, size_t stack_size);
     kthread(const kthread &other) = default;
     kthread(kthread &&other) = default;
 
     kthread &operator=(const kthread &other) = default;
     kthread &operator=(kthread &other) = default;
 
-    ~kthread()
-    {
-        kthread_scheduler::remove_thread(get_id());
-    }
+    ~kthread();
 
     uint32_t get_id() const { return id_; }
 
@@ -47,15 +44,13 @@ public:
     /**
      * Suspend the thread allowing other threads to run.
      */
-    error_code yield()
-    {
-        arch_context_save(&context_);
-    }
+    error yield();
 
 private:
     arch_context context_;
     uint32_t id_;
-    std::aligned_storage<512, 16> stack_;
+    uint64_t *stack_;
+    size_t stack_size_;
     kthread_entry entry_;
 };
 
@@ -72,25 +67,29 @@ public:
     /**
      * Add a thread to the scheduling list.
      */
-    static error_code add_thread(kthread &&thread);
+    static error add_thread(kthread &&thread);
 
-    static error_code remove_thread(uint32_t thread_id);
+    static error remove_thread(uint32_t thread_id);
+
+    static optional_t<kthread *> get_thread_by_id(const uint32_t thread_id);
 
     /**
      * Retrieve the currently running thread.
      */
-    static kthread &current_thread();
+    static const kthread &get_current_thread();
 
     /**
      * Schedule the next thread to run.
      */
-    static error_code schedule();
+    static error schedule();
 
 private:
     // TODO(RostakaGmfun): Add compilation option for array size
-    std::array<kthread, 16> threads_;
-    kthread idle_thread_;
-    std::size_t num_threads;
+    static constexpr auto thread_queue_size = 16;
+    static std::array<kthread, thread_queue_size> threads_;
+    static size_t current_thread_;
+    static kthread idle_thread_;
+    static std::size_t num_threads_;
 };
 
 } // namespace otrix
