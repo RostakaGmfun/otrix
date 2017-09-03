@@ -35,7 +35,7 @@ static inline void arch_context_setup(struct arch_context *ctx,
         const void * const stack, const size_t stack_size,
         void(*entry)(void *), void * const params)
 {
-    kASSERT(ctx != NULL && entry != NULL && params != NULL);
+    kASSERT(ctx != NULL && entry != NULL);
 
     // Copy current RFLAGS into the context RFLAGS
     asm volatile ("pushfq \npop %%rax\nmov %%rax, %0\n" :"=r"(ctx->rflags) : :"%rax" );

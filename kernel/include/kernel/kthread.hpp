@@ -25,12 +25,12 @@ class kthread
 {
 public:
     kthread();
-    kthread(kthread_entry entry, uint64_t *stack, size_t stack_size);
-    kthread(const kthread &other) = default;
-    kthread(kthread &&other) = default;
+    kthread(uint64_t *stack, size_t stack_size, kthread_entry entry);
+    kthread(const kthread &other) = delete;
+    kthread(kthread &&other);
 
-    kthread &operator=(const kthread &other) = default;
-    kthread &operator=(kthread &other) = default;
+    kthread &operator=(const kthread &other) = delete;
+    kthread &operator=(kthread &&other);
 
     ~kthread();
 

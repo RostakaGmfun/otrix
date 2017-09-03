@@ -12,18 +12,39 @@ std::size_t kthread_scheduler::num_threads_;
 kthread::kthread(): stack_(nullptr), stack_size_(0), entry_(nullptr)
 {}
 
-kthread::kthread(kthread_entry entry, uint64_t *stack, size_t stack_size):
+kthread::kthread(uint64_t *stack, size_t stack_size, kthread_entry entry):
     entry_(entry), stack_(stack), stack_size_(stack_size)
 {
-    static int largest_id = 0;
+    static int largest_id = 1;
     id_ = largest_id++;
     arch_context_setup(&context_, &stack_,
             stack_size, entry_, nullptr);
 }
 
+kthread::kthread(kthread &&other)
+{
+    *this = std::move(other);
+}
+
+kthread &kthread::operator=(kthread &&other)
+{
+    id_ = other.id_;
+    other.id_ = 0;
+    context_ = other.context_;
+    stack_ = other.stack_;
+    other.stack_ = nullptr;
+    stack_size_ = other.stack_size_;
+    other.stack_size_ = 0;
+    entry_ = other.entry_;
+    other.entry_ = nullptr;
+    return *this;
+}
+
 kthread::~kthread()
 {
-    kthread_scheduler::remove_thread(get_id());
+    if (id_ > 0) {
+        kthread_scheduler::remove_thread(get_id());
+    }
 }
 
 error kthread::yield()
@@ -38,7 +59,7 @@ error kthread_scheduler::add_thread(kthread &&thread)
         return error::nomem;
     }
 
-    threads_[num_threads_++] = thread;
+    threads_[num_threads_++] = std::move(thread);
 
     return error::ok;
 }
@@ -47,9 +68,8 @@ error kthread_scheduler::remove_thread(const uint32_t thread_id)
 {
     auto t = get_thread_by_id(thread_id);
     if (t != std::experimental::nullopt) {
-        auto &last = threads_[num_threads_];
+        auto &last = threads_[num_threads_--];
         std::swap(*(t.value()), last);
-        num_threads_--;
         return error::ok;
     }
 
@@ -59,7 +79,7 @@ error kthread_scheduler::remove_thread(const uint32_t thread_id)
 optional_t<kthread *> kthread_scheduler::get_thread_by_id(const uint32_t thread_id)
 {
     auto it = std::find_if(threads_.begin(), threads_.end(),
-        [thread_id] (const auto t)
+        [thread_id] (const auto &t)
         {
             return t.get_id() == thread_id;
         });
@@ -78,7 +98,9 @@ const kthread &kthread_scheduler::get_current_thread()
 
 error kthread_scheduler::schedule()
 {
-
+    current_thread_++;
+    current_thread_ %= num_threads_;
+    threads_[current_thread_].run();
 }
 
 }

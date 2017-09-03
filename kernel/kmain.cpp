@@ -1,8 +1,9 @@
 #include "dev/serial.h"
 //#include "dev/pci.h"
 //#include "kernel/kthread.h"
-#include "mini-printf.h"
+#include "kernel/kthread.hpp"
 // TODO(RostakaGMfun): Provide patch for mini-printf
+#include "mini-printf.h"
 #undef snprintf
 #undef vsnprintf
 //#include "kernel/kthread.hpp"
@@ -95,10 +96,40 @@ void print(const char *str)
 
 extern "C" {
 
+uint64_t t1_stack[128];
+uint64_t t2_stack[128];
+
 __attribute__((noreturn)) void kmain()
 {
     serial_init(&serial, SERIAL_BAUD_115200, SERIAL_COM1);
     print("Hello, otrix!\n");
+
+    const auto task1 =
+    const auto task2 = [](void *a) {
+        print("Task2\n");
+        while (1);
+    };
+
+    using otrix::kthread;
+    using otrix::kthread_scheduler;
+
+    auto thread1 = kthread(t1_stack, sizeof(t1_stack),
+            [](void *a) {
+                print("Task1\n");
+                while (1);
+            });
+
+    auto thread1 = kthread(t1_stack, sizeof(t1_stack),
+            [](void *a) {
+                print("Task1\n");
+                while (1);
+            });
+
+    kthread_scheduler::add_thread(thread1);
+
+    kthread_scheduler::add_thread(kthread(t2_stack, sizeof(t2_stack)));
+
+    kthread_scheduler::schedule();
     /*
 
     struct pci_device dev;
