@@ -67,7 +67,7 @@ public:
     /**
      * Add a thread to the scheduling list.
      */
-    static error add_thread(kthread &&thread);
+    static error add_thread(kthread &thread);
 
     static error remove_thread(uint32_t thread_id);
 
@@ -76,7 +76,7 @@ public:
     /**
      * Retrieve the currently running thread.
      */
-    static const kthread &get_current_thread();
+    static kthread &get_current_thread();
 
     /**
      * Schedule the next thread to run.

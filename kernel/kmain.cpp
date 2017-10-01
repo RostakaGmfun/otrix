@@ -104,52 +104,28 @@ __attribute__((noreturn)) void kmain()
     serial_init(&serial, SERIAL_BAUD_115200, SERIAL_COM1);
     print("Hello, otrix!\n");
 
-    const auto task1 =
-    const auto task2 = [](void *a) {
-        print("Task2\n");
-        while (1);
-    };
-
     using otrix::kthread;
     using otrix::kthread_scheduler;
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             [](void *a) {
                 print("Task1\n");
+                kthread_scheduler::get_current_thread().yield();
                 while (1);
             });
 
-    auto thread1 = kthread(t1_stack, sizeof(t1_stack),
+    auto thread2 = kthread(t2_stack, sizeof(t2_stack),
             [](void *a) {
-                print("Task1\n");
+                print("Task2\n");
+                kthread_scheduler::get_current_thread().yield();
+                print("after yield\r\n");
                 while (1);
             });
 
     kthread_scheduler::add_thread(thread1);
-
-    kthread_scheduler::add_thread(kthread(t2_stack, sizeof(t2_stack)));
+    kthread_scheduler::add_thread(thread2);
 
     kthread_scheduler::schedule();
-    /*
-
-    struct pci_device dev;
-    for (uint16_t i = VIRTIO_DEVICE_MIN_ID;
-         i < VIRTIO_DEVICE_MAX_ID; i++) {
-        if (pci_find_device(i, VIRTIO_VENDOR_ID, &dev) != ENODEV) {
-            print_virtio_pci(&dev);
-        }
-    }
-
-    print("Scan finished\n");
-
-    int p1 = 42;
-    kthread_create(&t1, thread1, &p1);
-
-    int p2 = 13;
-    kthread_create(&t2, thread2, &p2);
-
-    kthread_scheduler_run();
-    */
     while (1);
 }
 

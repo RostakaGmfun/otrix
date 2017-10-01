@@ -53,7 +53,7 @@ error kthread::yield()
     kthread_scheduler::schedule();
 }
 
-error kthread_scheduler::add_thread(kthread &&thread)
+error kthread_scheduler::add_thread(kthread &thread)
 {
     if (num_threads_ > thread_queue_size) {
         return error::nomem;
@@ -90,7 +90,7 @@ optional_t<kthread *> kthread_scheduler::get_thread_by_id(const uint32_t thread_
     return {};
 }
 
-const kthread &kthread_scheduler::get_current_thread()
+kthread &kthread_scheduler::get_current_thread()
 {
     return threads_[current_thread_];
 }
