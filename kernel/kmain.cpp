@@ -1,12 +1,10 @@
-#include "dev/serial.h"
-//#include "dev/pci.h"
-//#include "kernel/kthread.h"
 #include "kernel/kthread.hpp"
+#include "arch/idt.hpp"
+#include "otrix/immediate_console.hpp"
 // TODO(RostakaGMfun): Provide patch for mini-printf
 #include "mini-printf.h"
 #undef snprintf
 #undef vsnprintf
-//#include "kernel/kthread.hpp"
 
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
@@ -80,45 +78,33 @@ static void print_virtio_pci(const struct pci_device *dev)
 }
 */
 
-static size_t strlen(const char *str)
-{
-    size_t ret = 0;
-    while (*str++) ret++;
-    return ret;
-}
-
-static serial_dev serial;
-
-void print(const char *str)
-{
-    serial_write(&serial, (const uint8_t *)str, strlen(str));
-}
-
 extern "C" {
 
-uint64_t t1_stack[128];
-uint64_t t2_stack[128];
+static uint64_t t1_stack[128];
+static uint64_t t2_stack[128];
+
+using otrix::immediate_console;
+using otrix::kthread;
+using otrix::kthread_scheduler;
+using otrix::arch::isr_manager;
 
 __attribute__((noreturn)) void kmain()
 {
-    serial_init(&serial, SERIAL_BAUD_115200, SERIAL_COM1);
-    print("Hello, otrix!\n");
-
-    using otrix::kthread;
-    using otrix::kthread_scheduler;
+    immediate_console::init();
+    isr_manager::load_idt();
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             [](void *a) {
-                print("Task1\n");
+                immediate_console::print("Task1\n");
                 kthread_scheduler::get_current_thread().yield();
                 while (1);
             });
 
     auto thread2 = kthread(t2_stack, sizeof(t2_stack),
             [](void *a) {
-                print("Task2\n");
+                immediate_console::print("Task2\n");
                 kthread_scheduler::get_current_thread().yield();
-                print("after yield\r\n");
+                immediate_console::print("after yield\r\n");
                 while (1);
             });
 

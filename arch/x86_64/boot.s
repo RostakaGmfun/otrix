@@ -194,8 +194,10 @@ gdt64_pointer:
 
 .section .text
 .code64
+.extern __arch_init_array
 long_mode_start:
     cli
     mov $0x2f592f412f4b2f4f, %rax
     mov %rax, 0xb8000
+    call __arch_init_array
     call kmain

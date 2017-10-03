@@ -1,27 +1,178 @@
-#include "arch/idt.h"
+#include "arch/idt.hpp"
 #include <cstdint>
+#include <otrix/immediate_console.hpp>
 
-struct idt
+namespace otrix::arch
 {
-    uint16_t offset_low; /**< Bits 0-15 */
-    uint16_t cs;
-    uint8_t ist; /**< Interrupt stack table */
-    uint8_t type_dpl; /**< Folks say should be 0x8E */
-    uint16_t offset_mid; /**< Bits 16-31 */
-    uint32_t offset_high; /**< Bits 32-63 */
-} __attribute__((packed));
+
+static const char *exception_names[] = {
+    "divide_error",
+    "debug",
+    "nmi",
+    "breakpoint",
+    "overflow",
+    "bound_range_exceeded",
+    "invalid_opcode",
+    "device_not_available",
+    "double_fault",
+    "coprocessor_segment_overrun",
+    "invalid_tss",
+    "segment_not_present",
+    "stack_fault",
+    "general_protection",
+    "page_fault",
+    "reserved_exception15",
+    "fpu_fp_error",
+    "alignment_check",
+    "machine_check",
+    "simd_fp_exception",
+    "virtualization_exception",
+};
+void isr_manager::generic_handler(const enum isr_type type)
+{
+    immediate_console::print(exception_names[static_cast<int>(type)]);
+    immediate_console::print("\r\n");
+    while (1);
+}
+
+void isr_manager::general_protection_handler()
+{
+    while (1);
+}
+
+void isr_manager::nmi_handler()
+{
+    while (1);
+}
 
 namespace __idt_detail
 {
 
-constexpr auto NUM_IDT_ENTRIES = 31;
+using isr_handler_type =  void (*)();
+
+static void (*isr_handlers[])() = {
+    [] {
+        isr_manager::generic_handler(isr_type::divide_error);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::debug);
+    },
+
+    [] {
+        isr_manager::nmi_handler();
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::breakpoint);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::overflow);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::bound_range_exceeded);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::invalid_opcode);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::device_not_available);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::double_fault);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::coprocessor_segment_overrun);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::invalid_tss);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::segment_not_present);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::stack_fault);
+    },
+
+    [] {
+        isr_manager::general_protection_handler();
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::page_fault);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::reserved_exception15);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::fpu_fp_error);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::alignment_check);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::machine_check);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::simd_fp_exception);
+    },
+
+    [] {
+        isr_manager::generic_handler(isr_type::virtualization_exception);
+    },
+};
+
+static isr_handler_type hdl = [] { while (1); };
+
+constexpr auto NUM_IDT_ENTRIES = 20;
 static idt idt_table[NUM_IDT_ENTRIES] = { 0 };
 
-constexpr auto generate_idt()
+struct idt_pointer
 {
-    return nullptr;
+    uint16_t limit;
+    uint64_t base;
+} __attribute__((packed));
+
+static idt_pointer generate_idt()
+{
+    const auto default_handler = [] { while (1); };
+    for (int i = 0; i < NUM_IDT_ENTRIES; i++) {
+        const uint64_t handler_addr = reinterpret_cast<uint64_t>(isr_handlers[i]);
+        idt_table[i].offset_low = handler_addr & 0xFFFF;
+        idt_table[i].cs = 0x08; // Entry 1 (code) in GDT
+        idt_table[i].ist = 0;
+        idt_table[i].type_dpl = 0x8E; // interrupt gate, dpl 0
+        idt_table[i].offset_mid = handler_addr >> 16;
+        idt_table[i].offset_high = handler_addr >> 32;
+    }
+
+    const uint64_t idt_addr = reinterpret_cast<uint64_t>(idt_table);
+    return { sizeof(idt_table) - 1, idt_addr };
 }
 
 } // namespace __idt_detail
 
-constexpr idt *idt_table_ptr = __idt_detail::generate_idt();
+otrix::arch::__idt_detail::idt_pointer idt_table_ptr;
+
+void isr_manager::load_idt()
+{
+    idt_table_ptr = otrix::arch::__idt_detail::generate_idt();
+
+    __asm__ volatile("lidt %0" : : "m" (idt_table_ptr) : "memory");
+}
+
+} // namespace otrix::arch
