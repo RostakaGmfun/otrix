@@ -10,7 +10,7 @@ enable_testing()
 
 set(KERNEL_C_FLAGS -ffreestanding -fPIC -O0)
 set(KERNEL_CXX_FLAGS -fno-exceptions -fno-unwind-tables
-  -nostdlib -fno-rtti -std=c++17 -static -O0)
+  -nostdlib -fno-rtti -std=c++17 -static -O0 -ffreestanding)
 
 add_subdirectory(common)
 add_subdirectory(arch/${TARGET_ARCH})

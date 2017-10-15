@@ -1,10 +1,11 @@
 #include "kernel/kthread.hpp"
 #include <algorithm>
+#include <iterator>
 
 namespace otrix
 {
 
-std::array<kthread, kthread_scheduler::thread_queue_size> kthread_scheduler::threads_;
+kthread kthread_scheduler::threads_[kthread_scheduler::thread_queue_size];
 size_t kthread_scheduler::current_thread_;
 kthread kthread_scheduler::idle_thread_;
 std::size_t kthread_scheduler::num_threads_;
@@ -67,27 +68,27 @@ error kthread_scheduler::add_thread(kthread &thread)
 error kthread_scheduler::remove_thread(const uint32_t thread_id)
 {
     auto t = get_thread_by_id(thread_id);
-    if (t != std::experimental::nullopt) {
+    if (t != nullptr) {
         auto &last = threads_[num_threads_--];
-        std::swap(*(t.value()), last);
+        std::swap(*t, last);
         return error::ok;
     }
 
     return error::inval;
 }
 
-optional_t<kthread *> kthread_scheduler::get_thread_by_id(const uint32_t thread_id)
+kthread *kthread_scheduler::get_thread_by_id(const uint32_t thread_id)
 {
-    auto it = std::find_if(threads_.begin(), threads_.end(),
+    auto it = std::find_if(std::begin(threads_), std::end(threads_),
         [thread_id] (const auto &t)
         {
             return t.get_id() == thread_id;
         });
-    if (it != threads_.end()) {
+    if (it != std::end(threads_)) {
         return &(*it);
     }
 
-    return {};
+    return nullptr;
 }
 
 kthread &kthread_scheduler::get_current_thread()

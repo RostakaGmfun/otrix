@@ -54,6 +54,16 @@ public:
     static void nmi_handler();
 
     static void general_protection_handler();
+
+    static void systimer_interrupt();
+
+    static uint8_t get_systimer_isr_num()
+    {
+        return systimer_isr_num_;
+    }
+
+private:
+    static const uint8_t systimer_isr_num_ = 32;
 };
 
 } // namespace otrix::arch

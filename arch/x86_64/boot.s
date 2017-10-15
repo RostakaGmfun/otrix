@@ -181,6 +181,11 @@ p2_table:
 stack_bottom:
     .space 1024 * 16
 stack_top:
+
+.global __arch_lapic_id
+__arch_lapic_id:
+    .space 8
+
 .section .rodata
 gdt64:
     // zero entry
@@ -197,7 +202,12 @@ gdt64_pointer:
 .extern __arch_init_array
 long_mode_start:
     cli
-    mov $0x2f592f412f4b2f4f, %rax
-    mov %rax, 0xb8000
+    call load_lapic_id
     call __arch_init_array
     call kmain
+
+load_lapic_id:
+    mov $0x1, %eax
+    cpuid
+    mov %ebx, __arch_lapic_id
+    ret

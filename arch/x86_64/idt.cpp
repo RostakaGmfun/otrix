@@ -45,6 +45,11 @@ void isr_manager::nmi_handler()
     while (1);
 }
 
+void isr_manager::systimer_interrupt()
+{
+    immediate_console::print("Systimer interrupt\r\n");
+}
+
 namespace __idt_detail
 {
 
@@ -138,7 +143,7 @@ static void (*isr_handlers[])() = {
 
 static isr_handler_type hdl = [] { while (1); };
 
-constexpr auto NUM_IDT_ENTRIES = 20;
+constexpr auto NUM_IDT_ENTRIES = 256;
 static idt idt_table[NUM_IDT_ENTRIES] = { 0 };
 
 struct idt_pointer
@@ -147,17 +152,23 @@ struct idt_pointer
     uint64_t base;
 } __attribute__((packed));
 
+static void set_entry(isr_handler_type handler,
+        const uint8_t entry_num)
+{
+    const uint64_t handler_addr = reinterpret_cast<uint64_t>(handler);
+    idt_table[entry_num].offset_low = handler_addr & 0xFFFF;
+    idt_table[entry_num].cs = 0x08; // Entry 1 (code) in GDT
+    idt_table[entry_num].ist = 0;
+    idt_table[entry_num].type_dpl = 0x8E; // interrupt gate, dpl 0
+    idt_table[entry_num].offset_mid = handler_addr >> 16;
+    idt_table[entry_num].offset_high = handler_addr >> 32;
+}
+
 static idt_pointer generate_idt()
 {
     const auto default_handler = [] { while (1); };
-    for (int i = 0; i < NUM_IDT_ENTRIES; i++) {
-        const uint64_t handler_addr = reinterpret_cast<uint64_t>(isr_handlers[i]);
-        idt_table[i].offset_low = handler_addr & 0xFFFF;
-        idt_table[i].cs = 0x08; // Entry 1 (code) in GDT
-        idt_table[i].ist = 0;
-        idt_table[i].type_dpl = 0x8E; // interrupt gate, dpl 0
-        idt_table[i].offset_mid = handler_addr >> 16;
-        idt_table[i].offset_high = handler_addr >> 32;
+    for (int i = 0; i < sizeof(isr_handlers)/sizeof(isr_handlers[0]); i++) {
+        set_entry(isr_handlers[i], i);
     }
 
     const uint64_t idt_addr = reinterpret_cast<uint64_t>(idt_table);
@@ -170,7 +181,8 @@ otrix::arch::__idt_detail::idt_pointer idt_table_ptr;
 
 void isr_manager::load_idt()
 {
-    idt_table_ptr = otrix::arch::__idt_detail::generate_idt();
+    idt_table_ptr = __idt_detail::generate_idt();
+    __idt_detail::set_entry(systimer_interrupt, systimer_isr_num_);
 
     __asm__ volatile("lidt %0" : : "m" (idt_table_ptr) : "memory");
 }

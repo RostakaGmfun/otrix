@@ -3,17 +3,12 @@
 
 #include <cstddef>
 #include <type_traits>
-#include <array>
-#include <experimental/optional>
 
 #include "common/error.hpp"
 #include "arch/context.h"
 
 namespace otrix
 {
-
-template <typename T>
-using optional_t = std::experimental::optional<T>;
 
 // TODO(RostakaGmfun): Add more type safety
 using kthread_entry = void(*)(void *);
@@ -71,7 +66,7 @@ public:
 
     static error remove_thread(uint32_t thread_id);
 
-    static optional_t<kthread *> get_thread_by_id(const uint32_t thread_id);
+    static kthread *get_thread_by_id(const uint32_t thread_id);
 
     /**
      * Retrieve the currently running thread.
@@ -86,7 +81,7 @@ public:
 private:
     // TODO(RostakaGmfun): Add compilation option for array size
     static constexpr auto thread_queue_size = 16;
-    static std::array<kthread, thread_queue_size> threads_;
+    static kthread threads_[thread_queue_size];
     static size_t current_thread_;
     static kthread idle_thread_;
     static std::size_t num_threads_;

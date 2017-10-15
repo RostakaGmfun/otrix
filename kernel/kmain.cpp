@@ -1,6 +1,10 @@
 #include "kernel/kthread.hpp"
 #include "arch/idt.hpp"
 #include "otrix/immediate_console.hpp"
+#include "dev/acpi.h"
+#include "dev/lapic.hpp"
+#include "arch/cpu.h"
+
 // TODO(RostakaGMfun): Provide patch for mini-printf
 #include "mini-printf.h"
 #undef snprintf
@@ -87,11 +91,15 @@ using otrix::immediate_console;
 using otrix::kthread;
 using otrix::kthread_scheduler;
 using otrix::arch::isr_manager;
+using otrix::dev::local_apic;
 
 __attribute__((noreturn)) void kmain()
 {
     immediate_console::init();
     isr_manager::load_idt();
+    local_apic::configure_timer(local_apic::timer_mode::oneshot,
+            local_apic::timer_divider::divby_2,
+            isr_manager::get_systimer_isr_num());
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             [](void *a) {
@@ -104,7 +112,7 @@ __attribute__((noreturn)) void kmain()
             [](void *a) {
                 immediate_console::print("Task2\n");
                 kthread_scheduler::get_current_thread().yield();
-                immediate_console::print("after yield\r\n");
+                immediate_console::print("after yield\n");
                 while (1);
             });
 
