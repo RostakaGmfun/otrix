@@ -3,7 +3,7 @@
 #include "otrix/immediate_console.hpp"
 #include "dev/acpi.h"
 #include "dev/lapic.hpp"
-#include "arch/cpu.h"
+#include "arch/paging.hpp"
 
 // TODO(RostakaGMfun): Provide patch for mini-printf
 #include "mini-printf.h"
@@ -97,6 +97,7 @@ __attribute__((noreturn)) void kmain()
 {
     immediate_console::init();
     isr_manager::load_idt();
+    otrix::arch::init_identity_mapping();
     local_apic::configure_timer(local_apic::timer_mode::oneshot,
             local_apic::timer_divider::divby_2,
             isr_manager::get_systimer_isr_num());
