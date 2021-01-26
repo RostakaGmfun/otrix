@@ -1,18 +1,9 @@
 #include "otrix/immediate_console.hpp"
 #include "dev/serial.h"
+#include <cstring>
 
 namespace otrix
 {
-
-size_t strlen(const char *str)
-{
-    size_t size = 0;
-    while (*str++) {
-        size++;
-    }
-
-    return size;
-}
 
 // TODO: Move somewhere
 extern "C" serial_dev immediate_com_port;

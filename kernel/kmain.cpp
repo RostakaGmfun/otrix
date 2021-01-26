@@ -8,11 +8,12 @@
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
 #include <cstring>
+#include <cstdio>
 
 // TODO(RostakaGMfun): Provide patch for mini-printf
-#include "mini-printf.h"
-#undef snprintf
-#undef vsnprintf
+//#include "mini-printf.h"
+//#undef snprintf
+//#undef vsnprintf
 
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
@@ -56,15 +57,15 @@ static void init_heap()
                 const uint64_t mem_high_start = (uint64_t)&__binary_end;
                 const uint64_t mem_high_size = ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper;
                 static char buff[128];
-                mini_snprintf(buff, sizeof(buff), "Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
+                snprintf(buff, sizeof(buff), "Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
                 immediate_console::print(buff);
                 int cnt = 0;
                 for (int i = mem_high_start; i < mem_high_start + mem_high_size * 1024; i+=8) {
-                    //mini_snprintf(buff, sizeof(buff), "%08x %d\n", i, cnt++);
+                    //snprintf(buff, sizeof(buff), "%08x %d\n", i, cnt++);
                     //immediate_console::print(buff);
                     *(uint64_t *)i = 0xff00ff00ff00ff00;
                 }
-                mini_snprintf(buff, sizeof(buff), "%d\n", cnt++);
+                snprintf(buff, sizeof(buff), "%d\n", cnt++);
                 immediate_console::print(buff);
                 return;
             }
@@ -99,12 +100,12 @@ __attribute__((noreturn)) void kmain(void)
     immediate_console::print("11\n");
     char buff[256];
     for (int i = 0; i < num_devices; i++) {
-        mini_snprintf(buff, sizeof(buff), "PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
+        snprintf(buff, sizeof(buff), "PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
                 devices[i].bus_no, devices[i].dev_no, devices[i].device_id, devices[i].vendor_id,
                 devices[i].device_class, devices[i].device_subclass, devices[i].subsystem_id,
                 devices[i].subsystem_vendor_id);
         immediate_console::print(buff);
-        mini_snprintf(buff, sizeof(buff), "    BAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
+        snprintf(buff, sizeof(buff), "    BAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
                 devices[i].BAR0, devices[i].BAR1, devices[i].BAR2, devices[i].BAR3, devices[i].BAR4, devices[i].BAR5);
         immediate_console::print(buff);
     }

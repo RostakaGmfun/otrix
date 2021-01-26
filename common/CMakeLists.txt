@@ -1,9 +1,11 @@
 add_library(otrix_common INTERFACE)
 target_include_directories(otrix_common INTERFACE include/)
-target_link_libraries(otrix_common INTERFACE otrix_arch mini-printf)
+target_link_libraries(otrix_common INTERFACE otrix_arch)
 target_compile_options(otrix_common INTERFACE ${KERNEL_C_FLAGS})
 
+if(BUILD_HOST_TESTS)
 add_executable(intrusive_list_test test/test_runner.c test/list_test.c)
 target_include_directories(intrusive_list_test PUBLIC include/)
 target_link_libraries(intrusive_list_test unity)
 add_test(NAME intrusive_list_test COMMAND intrusive_list_test)
+endif()
