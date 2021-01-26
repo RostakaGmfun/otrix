@@ -5,7 +5,7 @@
 namespace otrix
 {
 
-kthread kthread_scheduler::threads_[kthread_scheduler::thread_queue_size];
+kthread *kthread_scheduler::threads_[kthread_scheduler::thread_queue_size];
 size_t kthread_scheduler::current_thread_;
 kthread kthread_scheduler::idle_thread_;
 std::size_t kthread_scheduler::num_threads_;
@@ -60,7 +60,7 @@ error kthread_scheduler::add_thread(kthread &thread)
         return error::nomem;
     }
 
-    threads_[num_threads_++] = std::move(thread);
+    threads_[num_threads_++] = &thread;
 
     return error::ok;
 }
@@ -70,7 +70,7 @@ error kthread_scheduler::remove_thread(const uint32_t thread_id)
     auto t = get_thread_by_id(thread_id);
     if (t != nullptr) {
         auto &last = threads_[num_threads_--];
-        std::swap(*t, last);
+        std::swap(t, last);
         return error::ok;
     }
 
@@ -82,10 +82,10 @@ kthread *kthread_scheduler::get_thread_by_id(const uint32_t thread_id)
     auto it = std::find_if(std::begin(threads_), std::end(threads_),
         [thread_id] (const auto &t)
         {
-            return t.get_id() == thread_id;
+            return t->get_id() == thread_id;
         });
     if (it != std::end(threads_)) {
-        return &(*it);
+        return *it;
     }
 
     return nullptr;
@@ -93,15 +93,14 @@ kthread *kthread_scheduler::get_thread_by_id(const uint32_t thread_id)
 
 kthread &kthread_scheduler::get_current_thread()
 {
-    return threads_[current_thread_];
+    return *threads_[current_thread_];
 }
-
 
 error kthread_scheduler::schedule()
 {
     current_thread_++;
     current_thread_ %= num_threads_;
-    threads_[current_thread_].run();
+    threads_[current_thread_]->run();
 }
 
 }

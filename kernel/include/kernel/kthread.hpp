@@ -81,7 +81,7 @@ public:
 private:
     // TODO(RostakaGmfun): Add compilation option for array size
     static constexpr auto thread_queue_size = 16;
-    static kthread threads_[thread_queue_size];
+    static kthread *threads_[thread_queue_size];
     static size_t current_thread_;
     static kthread idle_thread_;
     static std::size_t num_threads_;

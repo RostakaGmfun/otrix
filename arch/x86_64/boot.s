@@ -21,11 +21,18 @@ header_start:
 header_end:
 
 .extern kmain
+.global __multiboot_magic
+.global __multiboot_addr
+.extern grub_multiboot
 .section .text
 .code32
 .global start
 start:
     mov $stack_top, %esp
+
+    //  Save multiboot params
+    mov %eax, __multiboot_magic
+    mov %ebx, __multiboot_addr
 
     call check_multiboot
     call check_cpuid
@@ -196,6 +203,12 @@ gdt64:
 gdt64_pointer:
     .hword gdt64_pointer - gdt64 - 1
     .quad gdt64
+
+
+__multiboot_magic:
+    .int 0x0
+__multiboot_addr:
+    .int 0x0
 
 .section .text
 .code64

@@ -15,7 +15,8 @@ size_t strlen(const char *str)
 }
 
 // TODO: Move somewhere
-static serial_dev immediate_com_port;
+extern "C" serial_dev immediate_com_port;
+serial_dev immediate_com_port;
 
 bool immediate_console::inited_ = false;
 

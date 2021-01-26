@@ -9,12 +9,12 @@
 #define PCI_CFG_BUS_NUMBER(bus) (((bus) & 0xFF) << 16)
 #define PCI_CFG_DEV_NUMBER(dev) (((dev) & 0x1F) << 11)
 #define PCI_CFG_FUN_NUMBER(fun) (((fun) & 0x03) << 8)
-#define PCI_CFG_REG_NUMBER(reg) (((reg) & 0x3F) << 2)
+#define PCI_CFG_REG_NUMBER(reg) (((reg) & 0xFC))
 
 #define PCI_ADDR_MAX_DEVICES 0x1F
 #define PCI_ADDR_MAX_BUSES 0xFF
 
-#define PCI_CFG_REG(bus, dev, fun, reg) PCI_CFG_ADDR_ENABLE | \
+#define PCI_CFG_REG(bus, dev, fun, reg) PCI_CFG_ADDR_ENABLE | PCI_CFG_BUS_NUMBER(bus) | \
     PCI_CFG_DEV_NUMBER(dev) | PCI_CFG_FUN_NUMBER(fun) | PCI_CFG_REG_NUMBER(reg)
 
 enum pci_registers
@@ -39,6 +39,10 @@ enum pci_registers
     PCI_REG_SUBSYSTEM_ID = 0x2C,
     PCI_REG_BAR0 = 0x10,
     PCI_REG_BAR1 = 0x14,
+    PCI_REG_BAR2 = 0x18,
+    PCI_REG_BAR3 = 0x1C,
+    PCI_REG_BAR4 = 0x20,
+    PCI_REG_BAR5 = 0x24,
 #define PCI_REG_SUBSYS_ID(ret) ((reg & 0xFFFF0000) >> 16)
 #define PCI_REG_SUBSYS_VENDOR_ID(ret) ((reg & 0x0000FFFF))
     PCI_REG_SUBSYSTEM = 0x2C,
@@ -158,15 +162,22 @@ static error_t pci_read_device_config(struct pci_device * const device)
 {
     uint32_t reg = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_CLASS_SUBCLASS_REV_ID);
-    device->class = PCI_REG_CLASS_CODE(reg);
-    device->subclass = PCI_REG_SUBCLASS(reg);
+    device->device_class = PCI_REG_CLASS_CODE(reg);
+    device->device_subclass = PCI_REG_SUBCLASS(reg);
     device->revision_id = PCI_REG_REVISION_ID(reg);
 
-    // Read 64-bit BAR0
-    reg = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR0 = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR0);
-    device->BAR0 = ((uint64_t)reg << 32) | pci_config_read32(device->bus_no,
-            device->dev_no, device->function, PCI_REG_BAR1);
+    device->BAR1 = pci_config_read32(device->bus_no, device->dev_no,
+            device->function, PCI_REG_BAR1);
+    device->BAR2 = pci_config_read32(device->bus_no, device->dev_no,
+            device->function, PCI_REG_BAR2);
+    device->BAR3 = pci_config_read32(device->bus_no, device->dev_no,
+            device->function, PCI_REG_BAR3);
+    device->BAR4 = pci_config_read32(device->bus_no, device->dev_no,
+            device->function, PCI_REG_BAR4);
+    device->BAR5 = pci_config_read32(device->bus_no, device->dev_no,
+            device->function, PCI_REG_BAR5);
 
     reg = pci_config_read32(device->bus_no, device->dev_no,
                     device->function, PCI_REG_STATUS_COMMAND);
@@ -216,6 +227,35 @@ error_t pci_find_device(const uint16_t device_id, const uint16_t vendor_id,
     return ENODEV;
 }
 
+error_t pci_enumerate_devices(struct pci_device *devices, int array_size, int *num_devs_found) {
+    *num_devs_found = 0;
+    for (int bus = 0; bus < PCI_ADDR_MAX_BUSES - 1; bus++) {
+        for (int dev = 0; dev < PCI_ADDR_MAX_DEVICES - 1; dev++) {
+            uint32_t dev_vend = pci_config_read32(bus, dev, 0, PCI_REG_DEVICE_VENDOR);
+            if (PCI_REG_VENDOR_ID(dev_vend) == PCI_REG_ILLEGAL_VENDOR) {
+                continue;
+            }
+
+            struct pci_device *device = devices + *num_devs_found;
+            device->bus_no = bus;
+            device->dev_no = dev;
+            device->vendor_id = PCI_REG_VENDOR_ID(dev_vend);
+            device->device_id = PCI_REG_DEVICE_ID(dev_vend);
+            device->function = 0; // TODO(RostakaGmfun): handle device functions
+            error_t ret = pci_read_device_config(device);
+            if (ret != EOK) {
+                return ret;
+            }
+            (*num_devs_found)++;
+            if (*num_devs_found == array_size) {
+                return EOK;
+            }
+        }
+    }
+
+    return EOK;
+}
+
 error_t pci_read_capability(const struct pci_device * const device,
         const uint8_t cap_id, uint8_t * const buffer,
         const size_t size)
@@ -232,6 +272,18 @@ error_t pci_read_capability(const struct pci_device * const device,
                     device->function,
                     device->capabilities[i].offset + 2, buffer, size);
         }
+    }
+
+    return EOK;
+}
+
+error_t pci_probe(const struct pci_descriptor_t *p_desc, int num_desc) {
+    for (int i = 0; i < num_desc; i++) {
+        error_t ret = pci_find_device(p_desc[i].dev->device_id, p_desc[i].dev->vendor_id, p_desc[i].dev);
+        if (ret != EOK) {
+            continue;
+        }
+        p_desc[i].probe_fn(p_desc[i].dev);
     }
 
     return EOK;

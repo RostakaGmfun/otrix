@@ -141,8 +141,6 @@ static void (*isr_handlers[])() = {
     },
 };
 
-static isr_handler_type hdl = [] { while (1); };
-
 constexpr auto NUM_IDT_ENTRIES = 256;
 static idt idt_table[NUM_IDT_ENTRIES] = { 0 };
 

@@ -1,15 +1,7 @@
 let
   pkgs = import <nixpkgs> {};
-  nixpkgs-1703 = import (pkgs.fetchFromGitHub {
-    owner = "NixOS";
-    repo = "nixpkgs";
-    rev = "1849e695b00a54cda86cb75202240d949c10c7ce";
-    sha256 = "1fw9ryrz1qzbaxnjqqf91yxk1pb9hgci0z0pzw53f675almmv9q2";
-  }) { };
-  # TODO(RostakaGmfun): Use gcc7 from unstable pkgs
-  gcc = pkgs.gcc6;
 in
-  { pkgs ? nixpkgs-1703, build-gce-image ? false }:
+  { build-gce-image ? false }:
   let
     unity = pkgs.callPackage ./nix/unity.nix {};
     mini-printf = pkgs.callPackage ./nix/mini-printf.nix {};

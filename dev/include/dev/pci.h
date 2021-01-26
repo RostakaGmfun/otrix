@@ -7,6 +7,10 @@
 
 #define PCI_CFG_NUM_CAPABILITIES 16
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct pci_capability
 {
     uint8_t id;
@@ -22,15 +26,26 @@ struct pci_device
     uint16_t vendor_id;
     uint16_t status;
     uint16_t command;
-    uint8_t class;
-    uint8_t subclass;
+    uint8_t device_class;
+    uint8_t device_subclass;
     uint8_t revision_id;
     uint16_t subsystem_id;
     uint16_t subsystem_vendor_id;
-    uint64_t BAR0;
+    uint32_t BAR0;
+    uint32_t BAR1;
+    uint32_t BAR2;
+    uint32_t BAR3;
+    uint32_t BAR4;
+    uint32_t BAR5;
     uint8_t cap_ptr;
     struct pci_capability capabilities[PCI_CFG_NUM_CAPABILITIES];
 };
+
+typedef struct pci_descriptor_t {
+    const char *name;
+    struct pci_device *dev;
+    error_t (*probe_fn)(struct pci_device *dev);
+} pci_descriptor_t;
 
 /**
  * Find PCI device by Device ID and Vendor ID.
@@ -57,5 +72,13 @@ error_t pci_find_device(const uint16_t device_id, const uint16_t vendor_id,
  */
 error_t pci_read_capability(const struct pci_device * const device,
         const uint8_t cap_id, uint8_t * const buffer, const size_t size);
+
+error_t pci_enumerate_devices(struct pci_device *devices, int array_size, int *num_devs_found);
+
+error_t pci_probe(const struct pci_descriptor_t *p_desc, int num_desc);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // OTRIX_PCI_H

@@ -5,14 +5,16 @@ namespace otrix::dev
 
 enum lapic_registers
 {
-    lapic_id_reg = 0xFEE00020,
-    lapic_version_reg = 0xFEE00030,
-    lapic_eoi_reg = 0xFEE000B0,
-    lapic_timer_lvt = 0xFEE00320,
-    lapic_timer_divider_cfg = 0xFEE003E0,
-    lapic_timer_initial_cnt = 0xFEE00380,
-    lapic_timer_current_cnt = 0xFEE00390,
+    lapic_id_reg = 0x20,
+    lapic_version_reg = 0x30,
+    lapic_eoi_reg = 0xB0,
+    lapic_timer_lvt = 0x320,
+    lapic_timer_divider_cfg = 0x3E0,
+    lapic_timer_initial_cnt = 0x380,
+    lapic_timer_current_cnt = 0x390,
 };
+
+uint64_t local_apic::base_address_;
 
 static uint32_t read32(const uint64_t addr)
 {
@@ -22,6 +24,11 @@ static uint32_t read32(const uint64_t addr)
 static uint32_t write32(const uint64_t addr, const uint32_t value)
 {
     return *reinterpret_cast<volatile uint32_t *>(addr) = value;
+}
+
+void local_apic::init(const uint64_t base_address)
+{
+    base_address_ = base_address;
 }
 
 int32_t local_apic::id()

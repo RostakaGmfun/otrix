@@ -1,4 +1,4 @@
-#include "dev/acpi.h"
+#include "dev/acpi.hpp"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -77,7 +77,7 @@ struct acpi_rsdt
 struct acpi_madt
 {
     struct acpi_sdt_hdr hdr;
-    uint32_t local_controller_addr;
+    uint32_t local_apic_address;
     uint32_t flags;
     uint8_t entries[];
 } __attribute__((packed));
@@ -86,7 +86,7 @@ enum acpi_madt_entry_type
 {
     ACPI_MADT_LAPIC = 0,
     ACPI_MADT_IOAPIC = 1,
-    ACPI_MADT_INTR_OVERRIDE = 2,
+    ACPI_MADT_LAPIC_OVERRIDE = 2,
     ACPI_MADR_NMI = 4,
 };
 
@@ -105,12 +105,20 @@ struct acpi_madt_ioapic
     uint32_t global_system_interrupt_base;
 } __attribute__((packed));
 
+struct acpi_madt_lapic_override
+{
+    struct acpi_madt_entry_hdr hdr;
+    uint16_t reserved;
+    uint64_t lapic_address;
+} __attribute__((packed));
+
 static struct
 {
     struct acpi_rsdp *rsdp;
     struct acpi_rsdt *rsdt;
     void *ioapic_base;
     uint8_t ioapic_id;
+    void *lapic_base;
 } acpi_context;
 
 static error_t acpi_validate_checksum(const struct acpi_sdt_hdr *sdt)
@@ -134,11 +142,16 @@ static error_t acpi_parse_madt(const struct acpi_madt *madt)
     size_t num_entries = (madt->hdr.length - sizeof(struct acpi_madt))/8;
     const uint8_t *entry = madt->entries;
 
+    acpi_context.lapic_base = (void *)madt->local_apic_address;
+
     while (num_entries > 0) {
         const struct acpi_madt_entry_hdr *hdr = (void *)entry;
         entry += madt->hdr.length;
         num_entries--;
         switch (hdr->type) {
+        case ACPI_MADT_LAPIC_OVERRIDE:
+            acpi_context.lapic_base = (void *)((struct acpi_madt_lapic_override *)hdr)->lapic_address;
+            break;
         case ACPI_MADT_IOAPIC:
             acpi_madt_parse_ioapic((void *)hdr);
             break;
@@ -211,4 +224,9 @@ error_t acpi_init(void)
 void *acpi_get_io_apic(void)
 {
     return acpi_context.ioapic_base;
+}
+
+void *acpi_get_lapic_addr(void)
+{
+    return acpi_context.lapic_base;
 }
