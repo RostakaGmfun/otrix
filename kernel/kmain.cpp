@@ -10,11 +10,6 @@
 #include <cstring>
 #include <cstdio>
 
-// TODO(RostakaGMfun): Provide patch for mini-printf
-//#include "mini-printf.h"
-//#undef snprintf
-//#undef vsnprintf
-
 #define VIRTIO_VENDOR_ID 0x1AF4
 #define VIRTIO_DEVICE_MIN_ID 0x1000
 #define VIRTIO_DEVICE_MAX_ID 0x103F
@@ -61,23 +56,19 @@ static void init_heap()
                 immediate_console::print(buff);
                 int cnt = 0;
                 for (int i = mem_high_start; i < mem_high_start + mem_high_size * 1024; i+=8) {
-                    //snprintf(buff, sizeof(buff), "%08x %d\n", i, cnt++);
-                    //immediate_console::print(buff);
                     *(uint64_t *)i = 0xff00ff00ff00ff00;
                 }
+                memset((void *)mem_high_start, 0, mem_high_size * 1024);
                 snprintf(buff, sizeof(buff), "%d\n", cnt++);
                 immediate_console::print(buff);
                 return;
             }
             break;
             default:
-                immediate_console::print("sw\n");
                 break;
 
             }
-        immediate_console::print("t\n");
     }
-    immediate_console::print("b\n");
 }
 
 __attribute__((noreturn)) void kmain(void)
@@ -91,13 +82,11 @@ __attribute__((noreturn)) void kmain(void)
             isr_manager::get_systimer_isr_num());
     local_apic::start_timer(1);
     init_heap();
-    immediate_console::print("10\n");
 
     const int max_devices = 16;
     static pci_device devices[max_devices];
     int num_devices = 0;
     pci_enumerate_devices(devices, max_devices, &num_devices);
-    immediate_console::print("11\n");
     char buff[256];
     for (int i = 0; i < num_devices; i++) {
         snprintf(buff, sizeof(buff), "PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
@@ -134,7 +123,6 @@ __attribute__((noreturn)) void kmain(void)
     immediate_console::print("Added thread 2\n");
 
     kthread_scheduler::schedule();
-
 
     while (1);
 }
