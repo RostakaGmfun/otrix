@@ -9,7 +9,7 @@ add_test(NAME kmem_test COMMAND kmem_test)
 else()
 add_executable(otrix_kernel kmain.cpp kthread.cpp newlib_stubs.c cpp_stubs.cpp)
 target_link_libraries(otrix_kernel otrix_dev otrix_arch otrix_kmem)
-target_include_directories(otrix_kernel PUBLIC include/)
+target_include_directories(otrix_kernel PUBLIC include)
 
 install(TARGETS otrix_kernel RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 endif()
