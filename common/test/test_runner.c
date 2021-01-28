@@ -7,5 +7,5 @@ static void run_tests(void)
 
 int main(int argc, const char **argv)
 {
-    UnityMain(argc, argv, run_tests);
+    return UnityMain(argc, argv, run_tests);
 }

@@ -17,7 +17,7 @@ struct intrusive_list {
     struct intrusive_list *prev;
 };
 
-#define intrusive_list_entry(list_ptr, struct_name, member_name) \
+#define container_of(list_ptr, struct_name, member_name) \
     ((struct_name*)((uint8_t*)(list_ptr) - offsetof(struct_name, member_name)))
 
 typedef bool (*list_predicate)(const struct intrusive_list *node,

@@ -1,6 +1,5 @@
 add_library(otrix_common INTERFACE)
 target_include_directories(otrix_common INTERFACE include/)
-target_link_libraries(otrix_common INTERFACE otrix_arch)
 target_compile_options(otrix_common INTERFACE ${KERNEL_C_FLAGS})
 
 if(BUILD_HOST_TESTS)

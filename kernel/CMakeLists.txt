@@ -1,4 +1,5 @@
 add_library(otrix_kmem kmem.c)
+target_link_libraries(otrix_kmem otrix_common)
 target_include_directories(otrix_kmem PUBLIC include/)
 
 if(BUILD_HOST_TESTS)

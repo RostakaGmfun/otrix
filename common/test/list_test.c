@@ -39,7 +39,7 @@ TEST(list_tests, test_list_push_back)
 static bool mock_predicate(const struct intrusive_list *node,
         void *context)
 {
-    return intrusive_list_entry(node, test_data_t, node)->data
+    return container_of(node, test_data_t, node)->data
         == *(int*)context;
 }
 
