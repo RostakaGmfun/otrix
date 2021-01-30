@@ -2,6 +2,10 @@
 
 #include <string.h>
 
+#if defined(BUILD_HOST_TESTS)
+#include <stdio.h>
+#endif
+
 void kmem_init(kmem_heap_t *heap_desc, void *heap_start, size_t heap_size) {
     memset(heap_desc, 0, sizeof(kmem_heap_t));
     heap_desc->start = heap_start;
@@ -14,6 +18,9 @@ void kmem_init(kmem_heap_t *heap_desc, void *heap_start, size_t heap_size) {
 }
 
 void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
+
+    size = KMEM_PAD_ALLOCATION_SIZE(size);
+
     struct intrusive_list *p_free = heap_desc->free_list;
     do {
         if (size >= KMEM_FREE_BLOCK_PTR(p_free)->size) {
@@ -29,7 +36,6 @@ void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
     kmem_used_block_t *p_block = (void *)KMEM_FREE_BLOCK_PTR(p_free);
     uint8_t *p_after = (uint8_t *)p_block + sizeof(kmem_used_block_t) + size;
 
-    struct intrusive_list *prev = NULL;
     if (p_free == heap_desc->free_list) {
         if ((uint8_t *)heap_desc->start + heap_desc->size - p_after < sizeof(kmem_free_block_t)) {
             heap_desc->free_list = NULL;
@@ -38,12 +44,11 @@ void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
             new_free->size = KMEM_FREE_BLOCK_PTR(p_free)->size - size - sizeof(kmem_used_block_t);
             intrusive_list_init(&new_free->list_node);
             heap_desc->free_list = &new_free->list_node;
-            prev = &new_free->list_node;
         }
     } else {
-        prev = p_free->prev;
         // Sufficient space to allocate another free block?
         if ((uint8_t *)heap_desc->start + heap_desc->size - p_after > sizeof(kmem_free_block_t)) {
+            struct intrusive_list *prev = prev = p_free->prev;
             kmem_free_block_t *new_free = (kmem_free_block_t *)p_after;
             intrusive_list_init(&new_free->list_node);
             new_free->size = KMEM_FREE_BLOCK_PTR(p_free)->size - size - sizeof(kmem_used_block_t);
@@ -54,7 +59,6 @@ void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
         }
     }
 
-    p_block->prev_free = prev;
     p_block->magic = KMEM_BLOCK_MAGIC;
     p_block->size = size;
 
@@ -72,40 +76,60 @@ void kmem_free(kmem_heap_t *heap_desc, void *ptr) {
     }
 
     const size_t block_size = p_block->size;
+    // Create new free block
+    kmem_free_block_t *p_free = (void *)p_block;
+    intrusive_list_init(&p_free->list_node);
+    p_free->size = block_size;
 
-    if (NULL == p_block->prev_free) {
-        kASSERT((void *)p_block == heap_desc->start);
-        kmem_free_block_t *p_free = (void *)p_block;
-        intrusive_list_init(&p_free->list_node);
-        p_free->size = heap_desc->size - sizeof(kmem_used_block_t);
+    struct intrusive_list *p_head = heap_desc->free_list;
+    struct intrusive_list *p_prev = NULL;
+    do {
+        if ((void *)KMEM_FREE_BLOCK_PTR(p_head) > ptr) {
+            break;
+        }
+        p_prev = p_head;
+        p_head = p_head->next;
+    } while (p_head != heap_desc->free_list);
+
+    if (NULL == p_prev) {
+        heap_desc->free_list->prev->next = &p_free->list_node;
+        p_free->list_node.prev = heap_desc->free_list->prev;
+        p_free->list_node.next = heap_desc->free_list;
+        heap_desc->free_list->prev = &p_free->list_node;
         heap_desc->free_list = &p_free->list_node;
     } else {
-        struct intrusive_list *p_prev_free = p_block->prev_free;
-        if ((uint8_t *)KMEM_FREE_BLOCK_PTR(p_prev_free) + KMEM_FREE_BLOCK_PTR(p_prev_free)->size == (uint8_t *)p_block) {
-            // Merge with previous
-            KMEM_FREE_BLOCK_PTR(p_prev_free)->size += block_size;
-            // Account for reduced overhead when merging
-            KMEM_FREE_BLOCK_PTR(p_prev_free)->size += sizeof(kmem_used_block_t);
-        } else if ((uint8_t *)KMEM_FREE_BLOCK_PTR(p_prev_free->next) == (uint8_t *)p_block + block_size + sizeof(kmem_used_block_t)) {
-            // Merge with next
-            kmem_free_block_t *p_free = (void *)p_block;
-            p_free->size = block_size + KMEM_FREE_BLOCK_PTR(p_prev_free->next)->size + sizeof(kmem_used_block_t);
-            intrusive_list_init(&p_free->list_node);
-            if (p_prev_free != p_prev_free->next) {
-                // Account for reduced overhead when merging
-                p_free->size += sizeof(kmem_used_block_t);
-                intrusive_list_unlink_node(p_prev_free->next);
-                intrusive_list_insert(p_prev_free, &p_free->list_node);
-            } else {
-                // No merging, replace single free block with new one
-                heap_desc->free_list = &p_free->list_node;
-            }
-        } else {
-            // Create new free block
-            kmem_free_block_t *p_free = (void *)p_block;
-            intrusive_list_init(&p_free->list_node);
-            p_free->size = block_size;
-            intrusive_list_insert(p_prev_free, &p_free->list_node);
-        }
+        p_free->list_node.prev = p_prev;
+        p_free->list_node.next = p_prev->next;
+        p_prev->next = &p_free->list_node;
+        p_free->list_node.next->prev = &p_free->list_node;
     }
+
+    kmem_free_block_t *p_prev_block = KMEM_FREE_BLOCK_PTR(p_free->list_node.prev);
+    if ((uint8_t *)p_prev_block + p_prev_block->size + sizeof(kmem_used_block_t) == (uint8_t *)p_free) {
+        // Merge with previous
+        p_prev_block->size += block_size + sizeof(kmem_used_block_t);
+        intrusive_list_unlink_node(&p_free->list_node);
+        p_free = p_prev_block;
+    }
+
+    kmem_free_block_t *p_next_block = KMEM_FREE_BLOCK_PTR(p_free->list_node.next);
+    if ((uint8_t *)p_free + p_free->size + sizeof(kmem_used_block_t) == (uint8_t *)p_next_block) {
+        // Merge with next
+        p_free->size += p_next_block->size + sizeof(kmem_used_block_t);
+        intrusive_list_unlink_node(&p_next_block->list_node);
+    }
+
 }
+
+#if defined(BUILD_HOST_TESTS)
+void kmem_print_free(kmem_heap_t *heap_desc) {
+    struct intrusive_list *p_head = heap_desc->free_list;
+
+    int max = 10;
+    do {
+        const kmem_free_block_t *block = KMEM_FREE_BLOCK_PTR(p_head);
+        printf("Free block %p (off %08d) size %zd\n", block, (uint8_t *)block - (uint8_t *)heap_desc->start, block->size + sizeof(kmem_used_block_t));
+        p_head = p_head->next;
+    } while (p_head != heap_desc->free_list && max-- > 0);
+}
+#endif
