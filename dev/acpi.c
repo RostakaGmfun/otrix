@@ -142,7 +142,7 @@ static error_t acpi_parse_madt(const struct acpi_madt *madt)
     size_t num_entries = (madt->hdr.length - sizeof(struct acpi_madt))/8;
     const uint8_t *entry = madt->entries;
 
-    acpi_context.lapic_base = (void *)madt->local_apic_address;
+    acpi_context.lapic_base = (void *)(uintptr_t)madt->local_apic_address;
 
     while (num_entries > 0) {
         const struct acpi_madt_entry_hdr *hdr = (void *)entry;

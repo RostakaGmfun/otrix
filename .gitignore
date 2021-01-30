@@ -1,2 +1,5 @@
 build/
+tests_build/
 result
+*.bin
+*.iso

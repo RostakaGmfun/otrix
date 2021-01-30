@@ -52,6 +52,7 @@ error kthread::yield()
 {
     arch_context_save(&context_);
     kthread_scheduler::schedule();
+    return error::ok;
 }
 
 error kthread_scheduler::add_thread(kthread &thread)
@@ -101,6 +102,7 @@ error kthread_scheduler::schedule()
     current_thread_++;
     current_thread_ %= num_threads_;
     threads_[current_thread_]->run();
+    return error::ok;
 }
 
 }

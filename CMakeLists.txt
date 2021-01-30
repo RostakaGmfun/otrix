@@ -6,11 +6,12 @@ set(TARGET_ARCH x86_64)
 
 #add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-unwind-tables -std=c++17 -fno-rtti>)
 
-add_compile_options(-fno-tree-vectorize -ggdb3 -O0)
+add_compile_options(-fno-tree-vectorize)
 
 option(BUILD_HOST_TESTS "Build host tests instead of kernel" OFF)
 
 if(BUILD_HOST_TESTS)
+    add_compile_options(-ggdb3 -O0)
   enable_testing()
 else()
   add_subdirectory(arch/${TARGET_ARCH})

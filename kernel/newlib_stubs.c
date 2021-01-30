@@ -40,7 +40,7 @@ int kill()
     kASSERT(0);
 }
 
-int _exit()
+void _exit(int arg)
 {
     kASSERT(0);
 }

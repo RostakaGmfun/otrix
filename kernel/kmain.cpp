@@ -54,13 +54,7 @@ static void init_heap()
                 static char buff[128];
                 snprintf(buff, sizeof(buff), "Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
                 immediate_console::print(buff);
-                int cnt = 0;
-                for (int i = mem_high_start; i < mem_high_start + mem_high_size * 1024; i+=8) {
-                    *(uint64_t *)i = 0xff00ff00ff00ff00;
-                }
                 memset((void *)mem_high_start, 0, mem_high_size * 1024);
-                snprintf(buff, sizeof(buff), "%d\n", cnt++);
-                immediate_console::print(buff);
                 return;
             }
             break;
