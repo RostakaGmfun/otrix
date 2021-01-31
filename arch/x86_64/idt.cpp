@@ -192,10 +192,6 @@ void isr_manager::load_idt()
     // Set IDT
     asm volatile("lidt %0" : : "m" (idt_table_ptr) : "memory");
 
-    // Disable PIC
-    arch_io_write8(0x21, 0xff);
-    arch_io_write8(0xa1, 0xff);
-
     // Enable interrupts
     asm volatile("sti": : :"memory");
 }

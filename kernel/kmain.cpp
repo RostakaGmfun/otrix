@@ -1,5 +1,6 @@
 #include "kernel/kthread.hpp"
 #include "arch/idt.hpp"
+#include "arch/pic.hpp"
 #include "otrix/immediate_console.hpp"
 #include "dev/acpi.hpp"
 #include "dev/lapic.hpp"
@@ -68,6 +69,8 @@ static void init_heap()
 __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
+    otrix::arch::pic_init(32, 40);
+    otrix::arch::pic_disable();
     isr_manager::load_idt();
     otrix::arch::init_identity_mapping();
     local_apic::init((uint64_t)acpi_get_lapic_addr());
