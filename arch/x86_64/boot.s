@@ -214,7 +214,6 @@ __multiboot_addr:
 .code64
 .extern __arch_init_array
 long_mode_start:
-    cli
     call load_lapic_id
     call __arch_init_array
     call kmain

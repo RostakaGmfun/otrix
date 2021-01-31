@@ -14,7 +14,7 @@ struct idt
     uint8_t type_dpl; //!< Folks say should be 0x8E
     uint16_t offset_mid; //!< Bits 16-31
     uint32_t offset_high; //!< Bits 32-63
-    uint32_t reservered;
+    uint32_t reserved;
 } __attribute__((packed));
 
 enum class isr_type

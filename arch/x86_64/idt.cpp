@@ -1,6 +1,8 @@
-#include "arch/idt.hpp"
+#include <arch/idt.hpp>
+
 #include <cstdint>
 #include <otrix/immediate_console.hpp>
+#include <arch/io.h>
 
 namespace otrix::arch
 {
@@ -142,7 +144,7 @@ static void (*isr_handlers[])() = {
 };
 
 constexpr auto NUM_IDT_ENTRIES = 256;
-static idt idt_table[NUM_IDT_ENTRIES] = { 0 };
+alignas(16) static idt idt_table[NUM_IDT_ENTRIES] = { 0 };
 
 struct idt_pointer
 {
@@ -160,13 +162,18 @@ static void set_entry(isr_handler_type handler,
     idt_table[entry_num].type_dpl = 0x8E; // interrupt gate, dpl 0
     idt_table[entry_num].offset_mid = handler_addr >> 16;
     idt_table[entry_num].offset_high = handler_addr >> 32;
+    idt_table[entry_num].reserved = 0;
 }
+
+void default_handler()
+{
+    while (1);
+};
 
 static idt_pointer generate_idt()
 {
-    const auto default_handler = [] { while (1); };
-    for (int i = 0; i < sizeof(isr_handlers)/sizeof(isr_handlers[0]); i++) {
-        set_entry(isr_handlers[i], i);
+    for (int i = 0; i < NUM_IDT_ENTRIES; i++) {
+        set_entry(default_handler, i);
     }
 
     const uint64_t idt_addr = reinterpret_cast<uint64_t>(idt_table);
@@ -182,7 +189,15 @@ void isr_manager::load_idt()
     idt_table_ptr = __idt_detail::generate_idt();
     __idt_detail::set_entry(systimer_interrupt, systimer_isr_num_);
 
-    __asm__ volatile("lidt %0" : : "m" (idt_table_ptr) : "memory");
+    // Set IDT
+    asm volatile("lidt %0" : : "m" (idt_table_ptr) : "memory");
+
+    // Disable PIC
+    arch_io_write8(0x21, 0xff);
+    arch_io_write8(0xa1, 0xff);
+
+    // Enable interrupts
+    asm volatile("sti": : :"memory");
 }
 
 } // namespace otrix::arch
