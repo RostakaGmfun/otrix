@@ -1,5 +1,5 @@
 #include "dev/pci.h"
-#include "arch/io.h"
+#include "arch/asm.h"
 
 #define PCI_CFG_ADDR 0xCF8
 #define PCI_CFG_DATA 0xCFC

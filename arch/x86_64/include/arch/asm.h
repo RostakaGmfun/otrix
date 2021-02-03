@@ -1,5 +1,4 @@
-#ifndef OTRIX_ARCH_IO_H
-#define OTRIX_ARCH_IO_H
+#pragma once
 
 #include <stdint.h>
 
@@ -45,4 +44,12 @@ static inline void arch_io_wait(void)
     arch_io_write8(0x80, 0);
 }
 
-#endif // OTRIX_ARCH_IO_H
+static inline void arch_disable_interrupts(void)
+{
+    asm volatile("cli": : :"memory");
+}
+
+static inline void arch_enable_interrupts(void)
+{
+    asm volatile("sti": : :"memory");
+}

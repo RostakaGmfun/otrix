@@ -1,5 +1,5 @@
 #include <arch/pic.hpp>
-#include <arch/io.h>
+#include <arch/asm.h>
 
 #define PIC1_COMMAND  0x20
 #define PIC2_COMMAND  0xa0

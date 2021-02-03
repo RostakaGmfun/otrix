@@ -1,9 +1,10 @@
 #include "kernel/kthread.hpp"
-#include "arch/idt.hpp"
+#include "arch/irq_manager.hpp"
+#include "arch/asm.h"
 #include "arch/pic.hpp"
+#include "arch/lapic.hpp"
 #include "otrix/immediate_console.hpp"
 #include "dev/acpi.hpp"
-#include "dev/lapic.hpp"
 #include "dev/serial.h"
 #include "dev/pci.h"
 #include "arch/paging.hpp"
@@ -23,8 +24,6 @@ static uint64_t t2_stack[128];
 using otrix::immediate_console;
 using otrix::kthread;
 using otrix::kthread_scheduler;
-using otrix::arch::isr_manager;
-using otrix::dev::local_apic;
 
 static pci_descriptor_t pci_devices[] = {
     /*
@@ -71,14 +70,19 @@ __attribute__((noreturn)) void kmain(void)
     immediate_console::init();
     otrix::arch::pic_init(32, 40);
     otrix::arch::pic_disable();
-    isr_manager::load_idt();
+    otrix::arch::irq_manager::init();
+    arch_enable_interrupts();
     otrix::arch::init_identity_mapping();
+    /*
     local_apic::init((uint64_t)acpi_get_lapic_addr());
     local_apic::configure_timer(local_apic::timer_mode::oneshot,
             local_apic::timer_divider::divby_2,
             isr_manager::get_systimer_isr_num());
     local_apic::start_timer(1);
+    */
     init_heap();
+
+    otrix::arch::irq_manager::print_irq();
 
     const int max_devices = 16;
     static pci_device devices[max_devices];

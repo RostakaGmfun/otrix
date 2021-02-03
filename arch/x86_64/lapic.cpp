@@ -1,6 +1,6 @@
-#include "dev/lapic.hpp"
+#include "arch/lapic.hpp"
 
-namespace otrix::dev
+namespace otrix::arch
 {
 
 enum lapic_registers
@@ -14,21 +14,21 @@ enum lapic_registers
     lapic_timer_current_cnt = 0x390,
 };
 
-uint64_t local_apic::base_address_;
+volatile uint32_t *local_apic::lapic_ptr_;
 
-static uint32_t read32(const uint64_t addr)
+uint32_t local_apic::read32(const uint64_t reg)
 {
-    return *reinterpret_cast<volatile uint32_t *>(addr);
+    return *(lapic_ptr_ + reg);
 }
 
-static uint32_t write32(const uint64_t addr, const uint32_t value)
+void local_apic::write32(const uint64_t reg, const uint32_t value)
 {
-    return *reinterpret_cast<volatile uint32_t *>(addr) = value;
+    *(lapic_ptr_ + reg) = value;
 }
 
 void local_apic::init(const uint64_t base_address)
 {
-    base_address_ = base_address;
+    lapic_ptr_ = reinterpret_cast<volatile uint32_t *>(base_address);
 }
 
 int32_t local_apic::id()
@@ -65,4 +65,15 @@ int32_t local_apic::get_timer_counts()
     return read32(lapic_timer_current_cnt);
 }
 
-} // namespace otrix::dev
+uint8_t local_apic::get_active_irq()
+{
+    // TODO
+    return 0;
+}
+
+void local_apic::signal_eoi()
+{
+    write32(lapic_eoi_reg, 0);
+}
+
+} // namespace otrix::arch

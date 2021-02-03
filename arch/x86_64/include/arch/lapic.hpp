@@ -1,9 +1,8 @@
-#ifndef OTRIX_DEV_LAPIC_HPP
-#define OTRIX_DEV_LAPIC_HPP
+#pragma once
 
 #include <cstdint>
 
-namespace otrix::dev
+namespace otrix::arch
 {
 
 //!
@@ -60,10 +59,15 @@ public:
     //! Retrieve number of timer tick counts since the last shot.
     static int32_t get_timer_counts();
 
+    static uint8_t get_active_irq();
+
+    static void signal_eoi();
+
 private:
-    static uint64_t base_address_;
+    static uint32_t read32(const uint64_t reg);
+    static void write32(const uint64_t reg, const uint32_t value);
+
+    static volatile uint32_t *lapic_ptr_;
 };
 
-} // namesace otrix::dev
-
-#endif // OTRIX_DEV_LAPIC_HPP
+} // namesace otrix::arch

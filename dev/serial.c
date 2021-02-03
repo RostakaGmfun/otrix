@@ -1,7 +1,7 @@
 #include "dev/serial.h"
 #include <stdbool.h>
 
-#include "arch/io.h"
+#include "arch/asm.h"
 
 #ifdef __cplusplus
 extern "C" {
