@@ -4,34 +4,36 @@
 
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MSR_ENABLE 0x800
+#define IA32_APIC_BASE_MSR_X2APIC_ENABLE 0x400
 #define IA32_APIC_BASE_MSR_BSP 0x100
 #define IA32_PAT 0x277
+#define IA32_MSR_X2APIC_MMIO 0x800
 
 namespace otrix::arch
 {
 
 enum lapic_registers
 {
-    lapic_id_reg = 0x20,
-    lapic_version_reg = 0x30,
-    lapic_eoi_reg = 0xB0,
-    lapic_spurious_interrupt = 0xF0,
-    lapic_timer_lvt = 0x320,
-    lapic_timer_divider_cfg = 0x3E0,
-    lapic_timer_initial_cnt = 0x380,
-    lapic_timer_current_cnt = 0x390,
+    lapic_id_reg = 0x02,
+    lapic_version_reg = 0x03,
+    lapic_eoi_reg = 0x0B,
+    lapic_spurious_interrupt = 0x0F,
+    lapic_timer_lvt = 0x32,
+    lapic_timer_divider_cfg = 0x3E,
+    lapic_timer_initial_cnt = 0x38,
+    lapic_timer_current_cnt = 0x39,
 };
 
 volatile uint32_t *local_apic::lapic_ptr_;
 
 uint32_t local_apic::read32(const uint64_t reg)
 {
-    return *((const volatile uint8_t *)lapic_ptr_ + reg);
+    return arch_read_msr(IA32_MSR_X2APIC_MMIO + reg);
 }
 
 void local_apic::write32(const uint64_t reg, const uint32_t value)
 {
-    *((volatile uint8_t *)lapic_ptr_ + reg) = value;
+    arch_write_msr(IA32_MSR_X2APIC_MMIO + reg, value);
 }
 
 void local_apic::init(void *base_address)
@@ -42,32 +44,14 @@ void local_apic::init(void *base_address)
     } else {
         lapic_ptr_ = reinterpret_cast<volatile uint32_t *>(base_address);
     }
-    const uint64_t apic_msr_enable = ((uint64_t)lapic_ptr_ & 0xfffff100) | IA32_APIC_BASE_MSR_ENABLE | IA32_APIC_BASE_MSR_BSP;
+    const uint64_t apic_msr_enable = ((uint64_t)lapic_ptr_ & 0xfffff100) | IA32_APIC_BASE_MSR_ENABLE | IA32_APIC_BASE_MSR_BSP | IA32_APIC_BASE_MSR_X2APIC_ENABLE;
     arch_write_msr(IA32_APIC_BASE_MSR, apic_msr_enable);
+
     uint64_t verify = arch_read_msr(IA32_APIC_BASE_MSR);
-    for (uint32_t reg = 0x200; reg < 0x210; reg++) {
-        const uint64_t msr = arch_read_msr(reg);
-        otrix::immediate_console::print("%03x: %016x\n", reg, msr);
-    }
-    {
-        uint32_t reg = 0x250;
-        const uint64_t msr = arch_read_msr(reg);
-        otrix::immediate_console::print("%03x: %016x\n", reg, msr);
-    }
-    for (uint32_t reg = 0x258; reg < 0x25a; reg++) {
-        const uint64_t msr = arch_read_msr(reg);
-        otrix::immediate_console::print("%03x: %016x\n", reg, msr);
-    }
-    for (uint32_t reg = 0x268; reg < 0x270; reg++) {
-        const uint64_t msr = arch_read_msr(reg);
-        otrix::immediate_console::print("%03x: %016x\n", reg, msr);
-    }
-    const uint64_t pat_msr = arch_read_msr(IA32_PAT);
-    otrix::immediate_console::print("IA32_PAT: %016x\n", pat_msr);
     if (IA32_APIC_BASE_MSR_ENABLE == (verify & IA32_APIC_BASE_MSR_ENABLE)) {
-        otrix::immediate_console::print("xapic ok %016x\n", verify);
+        otrix::immediate_console::print("x2apic ok %016x\n", verify);
     } else {
-        otrix::immediate_console::print("xapic fail\n");
+        otrix::immediate_console::print("x2apic fail\n");
     }
     write32(lapic_spurious_interrupt, read32(lapic_spurious_interrupt) | 0x100);
 }
@@ -120,7 +104,7 @@ void local_apic::signal_eoi()
 void local_apic::print_regs()
 {
     using otrix::immediate_console;
-    immediate_console::print("LAPIC/%d @ %p, version %08x\n", *(volatile uint32_t *)0xfee000b0, lapic_ptr_, read32(lapic_id_reg));
+    immediate_console::print("LAPIC/%d, version %08x\n", read32(lapic_id_reg), read32(lapic_version_reg));
     immediate_console::print("LVT: %08x Spurious vector %08x\n", read32(lapic_timer_lvt), read32(lapic_spurious_interrupt));
 }
 

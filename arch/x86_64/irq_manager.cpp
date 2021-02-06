@@ -19,7 +19,7 @@ extern "C" void irq_manager_irq_handler()
 namespace otrix::arch
 {
 
-irq_manager::idt irq_manager::idt_table[irq_manager::NUM_IRQ];
+alignas(16) irq_manager::idt irq_manager::idt_table[irq_manager::NUM_IRQ];
 irq_manager::irq_entry irq_manager::irq_table[irq_manager::NUM_IRQ];
 
 static const char *exception_names[] = {

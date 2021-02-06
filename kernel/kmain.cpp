@@ -74,7 +74,6 @@ __attribute__((noreturn)) void kmain(void)
     otrix::arch::pic_init(32, 40);
     otrix::arch::pic_disable();
     otrix::arch::irq_manager::init();
-    arch_enable_interrupts();
     local_apic::init(acpi_get_lapic_addr());
     local_apic::print_regs();
     /*
@@ -83,6 +82,7 @@ __attribute__((noreturn)) void kmain(void)
             otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
     local_apic::start_timer(1);
     */
+    arch_enable_interrupts();
 
     otrix::arch::irq_manager::print_irq();
 
