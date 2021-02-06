@@ -90,9 +90,7 @@ void irq_manager::print_irq()
     immediate_console::print("IRQ table:\n");
     for (int i = FIRST_USER_IRQ_NUM; i < NUM_IRQ; i++) {
         if (irq_table[i].allocated) {
-            snprintf(buff, sizeof(buff), "IRQ%d called %d times, handler %p ", i, irq_table[i].counter, irq_table[i].handler);
-            immediate_console::print(buff);
-            immediate_console::print(irq_table[i].p_owner);
+            immediate_console::print("IRQ%d called %d times, handler %p %s\n", i, irq_table[i].counter, irq_table[i].handler, irq_table[i].p_owner);
         }
     }
 }

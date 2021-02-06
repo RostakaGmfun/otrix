@@ -1,6 +1,8 @@
 #include "otrix/immediate_console.hpp"
 #include "dev/serial.h"
 #include <cstring>
+#include <cstdarg>
+#include <cstdio>
 
 namespace otrix
 {
@@ -9,7 +11,8 @@ namespace otrix
 extern "C" serial_dev immediate_com_port;
 serial_dev immediate_com_port;
 
-bool immediate_console::inited_ = false;
+bool immediate_console::inited_;
+char immediate_console::message_buffer_[immediate_console::buffer_size_];
 
 void immediate_console::init()
 {
@@ -24,10 +27,19 @@ void immediate_console::init()
     inited_ = true;
 }
 
-void immediate_console::print(const char *str)
+void immediate_console::print(const char *format, ...)
 {
+    va_list ap;
+    va_start(ap, format);
+    int size = vsnprintf(message_buffer_, buffer_size_, format, ap);
+    va_end(ap);
+
+    if (size < 0) {
+        return;
+    }
+
     serial_write(&immediate_com_port,
-            (const uint8_t *)str, strlen(str));
+            (const uint8_t *)message_buffer_, size);
 }
 
 } // namespace otrix

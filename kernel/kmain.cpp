@@ -24,6 +24,7 @@ static uint64_t t2_stack[128];
 using otrix::immediate_console;
 using otrix::kthread;
 using otrix::kthread_scheduler;
+using otrix::arch::local_apic;
 
 static pci_descriptor_t pci_devices[] = {
     /*
@@ -51,9 +52,7 @@ static void init_heap()
                 extern uint64_t __binary_end;
                 const uint64_t mem_high_start = (uint64_t)&__binary_end;
                 const uint64_t mem_high_size = ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper;
-                static char buff[128];
-                snprintf(buff, sizeof(buff), "Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
-                immediate_console::print(buff);
+                immediate_console::print("Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
                 memset((void *)mem_high_start, 0, mem_high_size * 1024);
                 return;
             }
@@ -68,19 +67,23 @@ static void init_heap()
 __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
+    init_heap();
     otrix::arch::pic_init(32, 40);
     otrix::arch::pic_disable();
     otrix::arch::irq_manager::init();
     arch_enable_interrupts();
     otrix::arch::init_identity_mapping();
+    if (EOK != acpi_init()) {
+        immediate_console::print("Failed to parse ACPI tables\n");
+    }
+    local_apic::init(0);
+    local_apic::print_regs();
     /*
-    local_apic::init((uint64_t)acpi_get_lapic_addr());
     local_apic::configure_timer(local_apic::timer_mode::oneshot,
             local_apic::timer_divider::divby_2,
             isr_manager::get_systimer_isr_num());
     local_apic::start_timer(1);
     */
-    init_heap();
 
     otrix::arch::irq_manager::print_irq();
 
@@ -88,16 +91,13 @@ __attribute__((noreturn)) void kmain(void)
     static pci_device devices[max_devices];
     int num_devices = 0;
     pci_enumerate_devices(devices, max_devices, &num_devices);
-    char buff[256];
     for (int i = 0; i < num_devices; i++) {
-        snprintf(buff, sizeof(buff), "PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
+        immediate_console::print("PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
                 devices[i].bus_no, devices[i].dev_no, devices[i].device_id, devices[i].vendor_id,
                 devices[i].device_class, devices[i].device_subclass, devices[i].subsystem_id,
                 devices[i].subsystem_vendor_id);
-        immediate_console::print(buff);
-        snprintf(buff, sizeof(buff), "    BAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
+        immediate_console::print("    BAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
                 devices[i].BAR0, devices[i].BAR1, devices[i].BAR2, devices[i].BAR3, devices[i].BAR4, devices[i].BAR5);
-        immediate_console::print(buff);
     }
 
     pci_probe(pci_devices, sizeof(pci_devices) / sizeof(pci_devices[0]));

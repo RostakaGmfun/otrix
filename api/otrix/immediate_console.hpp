@@ -1,5 +1,6 @@
-#ifndef OTRIX_IMMEDIATE_CONSOLE_HPP
-#define OTRIX_IMMEDIATE_CONSOLE_HPP
+#pragma once
+
+#include <cstddef>
 
 namespace otrix
 {
@@ -12,12 +13,12 @@ public:
 
     static void init();
 
-    static void print(const char *str);
+    static void print(const char *format, ...);
 
 private:
     static bool inited_;
+    static constexpr size_t buffer_size_ = 2048;
+    static char message_buffer_[buffer_size_];
 };
 
 } // namespace otrix
-
-#endif // OTRIX_IMMEDIATE_CONSOLE_HPP

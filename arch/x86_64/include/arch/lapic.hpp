@@ -63,6 +63,8 @@ public:
 
     static void signal_eoi();
 
+    static void print_regs();
+
 private:
     static uint32_t read32(const uint64_t reg);
     static void write32(const uint64_t reg, const uint32_t value);

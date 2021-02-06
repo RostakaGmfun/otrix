@@ -53,3 +53,17 @@ static inline void arch_enable_interrupts(void)
 {
     asm volatile("sti": : :"memory");
 }
+
+static uint64_t arch_read_msr(uint32_t msr)
+{
+    uint32_t lo, hi;
+    asm volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+    return ((uint64_t)hi << 32) | lo;
+}
+
+static inline void arch_write_msr(uint32_t msr, uint64_t val)
+{
+    uint32_t lo = val & 0xFFFFFFFF;
+    uint32_t hi = val >> 32;
+    asm volatile("wrmsr" : : "a"(lo), "d"(hi), "c"(msr));
+}

@@ -1,6 +1,9 @@
 #include "dev/acpi.hpp"
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+
+#include "otrix/immediate_console.hpp"
 
 #define ACPI_BIOS_AREA_START ((void *)0x000E0000)
 #define ACPI_BIOS_AREA_END ((void *)0x000FFFFF)
@@ -9,29 +12,7 @@ static const char rsdp_signature[] = "RSD PTR";
 static const char rsdt_signature[] = "XSDT";
 static const char madt_signature[] = "MADT";
 
-// TODO(RostakaGmfun): move to common/
-static size_t strlen(const char *str)
-{
-    size_t ret = 0;
-    while (*str++) ret++;
-    return ret;
-}
-
-static int memcmp(const void *s1, const void *s2, size_t size)
-{
-    const uint8_t *us1 = s1, *us2 = s2;
-    while (size--) {
-        int diff = *us1 - *us2;
-        if (diff != 0) {
-            return diff;
-        }
-
-        *us1++;
-        *us2++;
-    }
-
-    return 0;
-}
+using otrix::immediate_console;
 
 struct acpi_rsdp
 {
@@ -145,7 +126,7 @@ static error_t acpi_parse_madt(const struct acpi_madt *madt)
     acpi_context.lapic_base = (void *)(uintptr_t)madt->local_apic_address;
 
     while (num_entries > 0) {
-        const struct acpi_madt_entry_hdr *hdr = (void *)entry;
+        const acpi_madt_entry_hdr *hdr = reinterpret_cast<const acpi_madt_entry_hdr *>(entry);
         entry += madt->hdr.length;
         num_entries--;
         switch (hdr->type) {
@@ -153,7 +134,7 @@ static error_t acpi_parse_madt(const struct acpi_madt *madt)
             acpi_context.lapic_base = (void *)((struct acpi_madt_lapic_override *)hdr)->lapic_address;
             break;
         case ACPI_MADT_IOAPIC:
-            acpi_madt_parse_ioapic((void *)hdr);
+            acpi_madt_parse_ioapic(reinterpret_cast<const acpi_madt_ioapic *>(hdr));
             break;
         default:
             break;
@@ -167,24 +148,28 @@ static error_t acpi_parse_sdt_entry(uint64_t addr)
 {
     const struct acpi_sdt_hdr *hdr = (const struct acpi_sdt_hdr *)addr;
     if (acpi_validate_checksum(hdr) != EOK) {
+        immediate_console::print("Failed %d\n", __LINE__);
         return EINVAL;
     }
 
     if (memcmp(hdr->signature, madt_signature, strlen(madt_signature)) == 0) {
-        return acpi_parse_madt((void *)hdr);
+        return acpi_parse_madt(reinterpret_cast<const acpi_madt *>(hdr));
     }
 
+    immediate_console::print("Failed %d\n", __LINE__);
     return EINVAL;
 }
 
 static error_t acpi_parse_rsdt(void)
 {
-    if (acpi_validate_checksum((void *)acpi_context.rsdt) != EOK) {
+    if (acpi_validate_checksum(reinterpret_cast<const acpi_sdt_hdr *>(acpi_context.rsdt)) != EOK) {
+        immediate_console::print("Failed %d\n", __LINE__);
         return EINVAL;
     }
 
     if (memcmp(&acpi_context.rsdt->hdr.signature, rsdt_signature,
                     strlen(rsdt_signature)) != 0) {
+        immediate_console::print("Failed %d\n", __LINE__);
         return EINVAL;
     }
 
@@ -192,6 +177,7 @@ static error_t acpi_parse_rsdt(void)
     for (int i = 0; i < num_entries; i++) {
         error_t ret = acpi_parse_sdt_entry(acpi_context.rsdt->sdt_pointers[i]);
         if (ret != EOK) {
+            immediate_console::print("Failed %d\n", __LINE__);
             return ret;
         }
     }
@@ -201,7 +187,7 @@ static error_t acpi_parse_rsdt(void)
 
 error_t acpi_init(void)
 {
-    uint64_t *ptr = ACPI_BIOS_AREA_START;
+    const uint64_t *ptr = reinterpret_cast<const uint64_t *>(ACPI_BIOS_AREA_START);
 
     while (ptr != ACPI_BIOS_AREA_END) {
         if (memcmp(ptr, rsdp_signature, strlen(rsdp_signature)) != 0) {
@@ -210,14 +196,16 @@ error_t acpi_init(void)
         }
         acpi_context.rsdp = (struct acpi_rsdp *)ptr;
         if (acpi_context.rsdp->revision == 0) {
+            immediate_console::print("Failed %d %d\n", __LINE__, acpi_context.rsdp->revision);
             return EINVAL; // not supported
         } else {
-            acpi_context.rsdt = (void *)acpi_context.rsdp->xsdt_addr;
+            acpi_context.rsdt = reinterpret_cast<acpi_rsdt *>(acpi_context.rsdp->xsdt_addr);
         }
 
         return acpi_parse_rsdt();
     }
 
+    immediate_console::print("Failed %d\n", __LINE__);
     return ENODEV;
 }
 
