@@ -30,7 +30,7 @@ public:
     //! Sets the base address for LAPIC
     //! \todo There is one LAPIC per CPU
     //!       so this class should not be static in the future.
-    static void init(const uint64_t base_address);
+    static void init(void *base_address);
 
     //! Retrieve the value of APIC ID register
     static int32_t id();

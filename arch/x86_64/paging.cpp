@@ -48,7 +48,7 @@ static uint64_t make_p3_entry(const uint64_t p2_addr)
 
 static uint64_t make_p2_entry(const uint64_t phys_addr)
 {
-    return PAGE_PRESENT | PAGE_RW | (1 << 7) | phys_addr;
+    return PAGE_PRESENT | PAGE_RW | (1 << 12) | (1 << 4) | (1 << 7) | (1 << 3) | phys_addr;
 }
 
 //! Map 1G of physical address space into P2 table with 2M pages

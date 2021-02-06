@@ -53,7 +53,6 @@ static void init_heap()
                 const uint64_t mem_high_start = (uint64_t)&__binary_end;
                 const uint64_t mem_high_size = ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper;
                 immediate_console::print("Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
-                memset((void *)mem_high_start, 0, mem_high_size * 1024);
                 return;
             }
             break;
@@ -68,20 +67,20 @@ __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
     init_heap();
-    otrix::arch::pic_init(32, 40);
-    otrix::arch::pic_disable();
-    otrix::arch::irq_manager::init();
-    arch_enable_interrupts();
     otrix::arch::init_identity_mapping();
     if (EOK != acpi_init()) {
         immediate_console::print("Failed to parse ACPI tables\n");
     }
-    local_apic::init(0);
+    otrix::arch::pic_init(32, 40);
+    otrix::arch::pic_disable();
+    otrix::arch::irq_manager::init();
+    arch_enable_interrupts();
+    local_apic::init(acpi_get_lapic_addr());
     local_apic::print_regs();
     /*
     local_apic::configure_timer(local_apic::timer_mode::oneshot,
             local_apic::timer_divider::divby_2,
-            isr_manager::get_systimer_isr_num());
+            otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
     local_apic::start_timer(1);
     */
 

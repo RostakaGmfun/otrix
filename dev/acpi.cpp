@@ -9,8 +9,9 @@
 #define ACPI_BIOS_AREA_END ((void *)0x000FFFFF)
 
 static const char rsdp_signature[] = "RSD PTR";
-static const char rsdt_signature[] = "XSDT";
-static const char madt_signature[] = "MADT";
+static const char rsdt_signature[] = "RSDT";
+static const char xsdt_signature[] = "XSDT";
+static const char madt_signature[] = "APIC";
 
 using otrix::immediate_console;
 
@@ -49,7 +50,7 @@ struct acpi_sdt_hdr
 struct acpi_rsdt
 {
     struct acpi_sdt_hdr hdr;
-    uint8_t sdt_pointers[];
+    uint32_t sdt_pointers[];
 } __attribute__((packed));
 
 /**
@@ -95,8 +96,6 @@ struct acpi_madt_lapic_override
 
 static struct
 {
-    struct acpi_rsdp *rsdp;
-    struct acpi_rsdt *rsdt;
     void *ioapic_base;
     uint8_t ioapic_id;
     void *lapic_base;
@@ -112,18 +111,28 @@ static error_t acpi_validate_checksum(const struct acpi_sdt_hdr *sdt)
     return (checksum == 0 ? EOK : EINVAL);
 }
 
+static void acpi_print_sdt_hdr(const struct acpi_sdt_hdr *sdt)
+{
+    immediate_console::print("SDT: %.4s len %08x rev %d chksum %02x OEMID %.6s OEMTABLEid %.8s OEMRevision %08x creator %08x creator_id %08x\n",
+            sdt->signature, sdt->length, sdt->revision, sdt->checksum, sdt->OEMID, sdt->OEMTableID, sdt->OEMRevision, sdt->creator_id, sdt->creator_revision);
+}
+
+
 static void acpi_madt_parse_ioapic(const struct acpi_madt_ioapic *ioapic)
 {
     acpi_context.ioapic_base = (void *)((uint64_t)ioapic->ioapic_base);
     acpi_context.ioapic_id = ioapic->ioapic_id;
+    immediate_console::print("IOAPIC base %p, id\n", acpi_context.ioapic_base, acpi_context.ioapic_id);
 }
 
 static error_t acpi_parse_madt(const struct acpi_madt *madt)
 {
-    size_t num_entries = (madt->hdr.length - sizeof(struct acpi_madt))/8;
+    immediate_console::print("Parsing MADT @ %p\n", madt);
+    int num_entries = (madt->hdr.length - sizeof(struct acpi_madt))/8;
     const uint8_t *entry = madt->entries;
 
     acpi_context.lapic_base = (void *)(uintptr_t)madt->local_apic_address;
+    immediate_console::print("LAPIC base %p\n", acpi_context.lapic_base);
 
     while (num_entries > 0) {
         const acpi_madt_entry_hdr *hdr = reinterpret_cast<const acpi_madt_entry_hdr *>(entry);
@@ -132,6 +141,7 @@ static error_t acpi_parse_madt(const struct acpi_madt *madt)
         switch (hdr->type) {
         case ACPI_MADT_LAPIC_OVERRIDE:
             acpi_context.lapic_base = (void *)((struct acpi_madt_lapic_override *)hdr)->lapic_address;
+            immediate_console::print("LAPIC override %p\n", acpi_context.lapic_base);
             break;
         case ACPI_MADT_IOAPIC:
             acpi_madt_parse_ioapic(reinterpret_cast<const acpi_madt_ioapic *>(hdr));
@@ -146,36 +156,41 @@ static error_t acpi_parse_madt(const struct acpi_madt *madt)
 
 static error_t acpi_parse_sdt_entry(uint64_t addr)
 {
+    immediate_console::print("Parsing SDT @ %p\n", addr);
     const struct acpi_sdt_hdr *hdr = (const struct acpi_sdt_hdr *)addr;
+    acpi_print_sdt_hdr(hdr);
     if (acpi_validate_checksum(hdr) != EOK) {
         immediate_console::print("Failed %d\n", __LINE__);
         return EINVAL;
     }
 
     if (memcmp(hdr->signature, madt_signature, strlen(madt_signature)) == 0) {
+        immediate_console::print("Parsing %.4s\n", hdr->signature);
         return acpi_parse_madt(reinterpret_cast<const acpi_madt *>(hdr));
     }
 
-    immediate_console::print("Failed %d\n", __LINE__);
-    return EINVAL;
+    return EOK;
 }
 
-static error_t acpi_parse_rsdt(void)
+static error_t acpi_parse_rsdt(const acpi_rsdt *rsdt)
 {
-    if (acpi_validate_checksum(reinterpret_cast<const acpi_sdt_hdr *>(acpi_context.rsdt)) != EOK) {
+    if (acpi_validate_checksum(&rsdt->hdr) != EOK) {
         immediate_console::print("Failed %d\n", __LINE__);
         return EINVAL;
     }
 
-    if (memcmp(&acpi_context.rsdt->hdr.signature, rsdt_signature,
+    acpi_print_sdt_hdr(&rsdt->hdr);
+
+    if (memcmp(rsdt->hdr.signature, rsdt_signature,
                     strlen(rsdt_signature)) != 0) {
-        immediate_console::print("Failed %d\n", __LINE__);
+        immediate_console::print("Failed %d %02x %02x %02x %02x %.4s\n", __LINE__, rsdt->hdr.signature[0], rsdt->hdr.signature[1], rsdt->hdr.signature[2], rsdt->hdr.signature[3], (char *)rsdt->hdr.signature);
         return EINVAL;
     }
 
-    const int num_entries = (acpi_context.rsdt->hdr.length - sizeof(struct acpi_rsdt))/8;
+    const int num_entries = (rsdt->hdr.length - sizeof(struct acpi_rsdt)) / 4;
+    immediate_console::print("num_entries: %d\n", num_entries);
     for (int i = 0; i < num_entries; i++) {
-        error_t ret = acpi_parse_sdt_entry(acpi_context.rsdt->sdt_pointers[i]);
+        error_t ret = acpi_parse_sdt_entry(rsdt->sdt_pointers[i]);
         if (ret != EOK) {
             immediate_console::print("Failed %d\n", __LINE__);
             return ret;
@@ -194,15 +209,15 @@ error_t acpi_init(void)
             ptr++;
             continue;
         }
-        acpi_context.rsdp = (struct acpi_rsdp *)ptr;
-        if (acpi_context.rsdp->revision == 0) {
-            immediate_console::print("Failed %d %d\n", __LINE__, acpi_context.rsdp->revision);
-            return EINVAL; // not supported
+        const acpi_rsdp *rsdp = (struct acpi_rsdp *)ptr;
+        immediate_console::print("ACPI version %d @ %p OEMID %.6s\n", rsdp->revision, ptr, rsdp->OEMID);
+        if (0 == rsdp->revision) {
+            immediate_console::print("RSDT addr %d 0x%08x\n", rsdp->revision, rsdp->rsdt_addr);
+            return acpi_parse_rsdt(reinterpret_cast<const acpi_rsdt *>(rsdp->rsdt_addr));
         } else {
-            acpi_context.rsdt = reinterpret_cast<acpi_rsdt *>(acpi_context.rsdp->xsdt_addr);
+            immediate_console::print("XSDT addr %d 0x%08x\n", rsdp->revision, rsdp->xsdt_addr);
+            return acpi_parse_rsdt(reinterpret_cast<const acpi_rsdt *>(rsdp->xsdt_addr));
         }
-
-        return acpi_parse_rsdt();
     }
 
     immediate_console::print("Failed %d\n", __LINE__);
