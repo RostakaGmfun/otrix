@@ -195,11 +195,11 @@ __arch_lapic_id:
 
 .section .rodata
 gdt64:
-    // zero entry
     .quad 0
-.code:
-    // code
+.gdt_code:
     .quad (1<<43) | (1<<44) | (1<<47) | (1<<53)
+.gdt_data:
+    .quad (1<<44) | (1<<47) | (1 << 41)
 gdt64_pointer:
     .hword gdt64_pointer - gdt64 - 1
     .quad gdt64
@@ -214,6 +214,13 @@ __multiboot_addr:
 .code64
 .extern __arch_init_array
 long_mode_start:
+    cli
+    mov $0x10, %cx // 0x10 = data seg
+    mov %cx, %ds
+    mov %cx, %es
+    mov %cx, %fs
+    mov %cx, %gs
+    mov %cx, %ss
     call load_lapic_id
     call __arch_init_array
     call kmain

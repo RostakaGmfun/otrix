@@ -114,7 +114,7 @@ irq_manager::idt_pointer irq_manager::generate_idt()
         set_entry(arch_exception_handler, i);
     }
 
-    for (int i = 0; i < NUM_IRQ; i++) {
+    for (int i = FIRST_USER_IRQ_NUM; i < NUM_IRQ; i++) {
         set_entry(arch_unused_irq_handler, i);
     }
 

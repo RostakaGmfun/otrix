@@ -62,7 +62,7 @@ private:
     static idt_pointer generate_idt();
 
     static constexpr auto NUM_IRQ = 256;
-    static constexpr auto FIRST_USER_IRQ_NUM = 31;
+    static constexpr auto FIRST_USER_IRQ_NUM = 32;
 
     struct idt
     {

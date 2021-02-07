@@ -31,12 +31,12 @@ static uint64_t make_p3_entry(const uint64_t p2_addr)
 
 static uint64_t make_p3_entry_huge(const uint64_t phys_addr)
 {
-    return PAGE_PRESENT | PAGE_RW | PAGE_PAT_HUGE | PAGE_CD | PAGE_WT | PAGE_HUGE | phys_addr;
+    return PAGE_PRESENT | PAGE_RW | PAGE_HUGE | phys_addr;
 }
 
 static uint64_t make_p2_entry_huge(const uint64_t phys_addr)
 {
-    return PAGE_PRESENT | PAGE_RW | PAGE_PAT_HUGE | PAGE_CD | PAGE_WT | PAGE_HUGE | phys_addr;
+    return PAGE_PRESENT | PAGE_RW | PAGE_HUGE | phys_addr;
 }
 
 void init_identity_mapping()

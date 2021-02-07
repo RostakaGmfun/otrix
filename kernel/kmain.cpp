@@ -16,10 +16,8 @@
 #define VIRTIO_DEVICE_MIN_ID 0x1000
 #define VIRTIO_DEVICE_MAX_ID 0x103F
 
-extern "C" {
-
 static uint64_t t1_stack[1024];
-static uint64_t t2_stack[128];
+static uint64_t t2_stack[1024];
 
 using otrix::immediate_console;
 using otrix::kthread;
@@ -63,7 +61,12 @@ static void init_heap()
     }
 }
 
-__attribute__((noreturn)) void kmain(void)
+void  timer_irq()
+{
+    while (1);
+}
+
+extern "C" __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
     init_heap();
@@ -76,15 +79,12 @@ __attribute__((noreturn)) void kmain(void)
     otrix::arch::irq_manager::init();
     local_apic::init(acpi_get_lapic_addr());
     local_apic::print_regs();
-    /*
     local_apic::configure_timer(local_apic::timer_mode::oneshot,
-            local_apic::timer_divider::divby_2,
-            otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
-    local_apic::start_timer(1);
-    */
-    arch_enable_interrupts();
-
+            local_apic::timer_divider::divby_32,
+            otrix::arch::irq_manager::request_irq(timer_irq, "APIC timer"));
     otrix::arch::irq_manager::print_irq();
+    arch_enable_interrupts();
+    local_apic::start_timer(0x1000);
 
     const int max_devices = 16;
     static pci_device devices[max_devices];
@@ -123,8 +123,5 @@ __attribute__((noreturn)) void kmain(void)
     immediate_console::print("Added thread 2\n");
 
     kthread_scheduler::schedule();
-
     while (1);
-}
-
 }
