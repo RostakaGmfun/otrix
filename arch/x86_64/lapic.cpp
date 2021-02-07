@@ -18,6 +18,7 @@ enum lapic_registers
     lapic_version_reg = 0x03,
     lapic_eoi_reg = 0x0B,
     lapic_spurious_interrupt = 0x0F,
+    lapic_isr = 0x10,
     lapic_timer_lvt = 0x32,
     lapic_timer_divider_cfg = 0x3E,
     lapic_timer_initial_cnt = 0x38,
@@ -90,10 +91,15 @@ int32_t local_apic::get_timer_counts()
     return read32(lapic_timer_current_cnt);
 }
 
-uint8_t local_apic::get_active_irq()
+int local_apic::get_active_irq()
 {
-    // TODO
-    return 0;
+    for (int i = 8; i >= 1; i--) {
+        const uint32_t isr = read32(lapic_isr + i);
+        if (isr) {
+            return 32 * i + __builtin_ffs(isr) - 1;
+        }
+    }
+    return -1;
 }
 
 void local_apic::signal_eoi()

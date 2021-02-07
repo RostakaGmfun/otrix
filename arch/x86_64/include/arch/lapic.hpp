@@ -59,7 +59,7 @@ public:
     //! Retrieve number of timer tick counts since the last shot.
     static int32_t get_timer_counts();
 
-    static uint8_t get_active_irq();
+    static int get_active_irq();
 
     static void signal_eoi();
 

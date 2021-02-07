@@ -61,11 +61,6 @@ static void init_heap()
     }
 }
 
-void  timer_irq()
-{
-    while (1);
-}
-
 extern "C" __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
@@ -79,12 +74,12 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     otrix::arch::irq_manager::init();
     local_apic::init(acpi_get_lapic_addr());
     local_apic::print_regs();
-    local_apic::configure_timer(local_apic::timer_mode::oneshot,
+    local_apic::configure_timer(local_apic::timer_mode::periodic,
             local_apic::timer_divider::divby_32,
-            otrix::arch::irq_manager::request_irq(timer_irq, "APIC timer"));
+            otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
     otrix::arch::irq_manager::print_irq();
     arch_enable_interrupts();
-    local_apic::start_timer(0x1000);
+    local_apic::start_timer(0x1);
 
     const int max_devices = 16;
     static pci_device devices[max_devices];
@@ -122,6 +117,7 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     kthread_scheduler::add_thread(thread2);
     immediate_console::print("Added thread 2\n");
 
-    kthread_scheduler::schedule();
+    //kthread_scheduler::schedule();
+    otrix::arch::irq_manager::print_irq();
     while (1);
 }
