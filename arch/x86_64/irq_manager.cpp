@@ -36,7 +36,7 @@ void irq_manager::init()
 
 int irq_manager::request_irq(irq_handler_t p_handler, const char *p_owner)
 {
-    arch_disable_interrupts();
+    const auto flags = arch_irq_save();
     int ret = -1;
     for (int i = FIRST_USER_IRQ_NUM; i < NUM_IRQ; i++) {
         if (!irq_table[i].allocated) {
@@ -49,7 +49,7 @@ int irq_manager::request_irq(irq_handler_t p_handler, const char *p_owner)
             break;
         }
     }
-    arch_enable_interrupts();
+    arch_irq_restore(flags);
     return ret;
 }
 

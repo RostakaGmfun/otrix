@@ -46,7 +46,7 @@ enum pci_registers
 #define PCI_REG_SUBSYS_ID(ret) ((reg & 0xFFFF0000) >> 16)
 #define PCI_REG_SUBSYS_VENDOR_ID(ret) ((reg & 0x0000FFFF))
     PCI_REG_SUBSYSTEM = 0x2C,
-#define PCI_REG_GET_CAP_PTR(reg) (reg & 0x000000FF)
+#define PCI_REG_GET_CAP_PTR(reg) (reg & 0x000000FC)
     PCI_REG_CAP_PTR = 0x34,
 #define PCI_REG_INT_PIN(reg) ((reg & 0x0000FF00) >> 8)
 #define PCI_REG_INT_LINE(reg) (reg & 0x000000FF)
@@ -138,15 +138,18 @@ static inline error_t pci_config_read_buffer(const uint8_t bus,
 static error_t pci_read_device_capabilities(struct pci_device * const device)
 {
     size_t cap = 0;
-    uint8_t next;
+    uint8_t next = device->cap_ptr;
     do {
         device->capabilities[cap].id = pci_config_read8(device->bus_no,
-                device->dev_no, device->function, device->cap_ptr + PCI_CAP_ID);
-        next = pci_config_read8(device->bus_no,
-                device->dev_no, device->function, device->cap_ptr + PCI_CAP_NEXT);
+                device->dev_no, device->function, next);
         device->capabilities[cap].offset = next;
-        cap++;
-    } while (next != 0x00);
+        next = pci_config_read8(device->bus_no,
+                device->dev_no, device->function, next + 1);
+        if (0 != device->capabilities[cap].id) {
+            // Don't save NULL capabilities
+            cap++;
+        }
+    } while (next != 0x00 && cap < PCI_CFG_NUM_CAPABILITIES);
 
     return EOK;
 }

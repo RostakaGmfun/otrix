@@ -32,13 +32,11 @@ extern void arch_context_save(struct arch_context *context);
 extern void arch_context_restore(const struct arch_context *context);
 
 static inline void arch_context_setup(struct arch_context *ctx,
-        const void * const stack, const size_t stack_size,
+        uint64_t *stack, const size_t stack_size,
         void(*entry)(void))
 {
-    kASSERT(ctx != NULL && entry != NULL);
-
     // Copy current RFLAGS into the context RFLAGS
-    asm volatile ("pushfq \npop %%rax\nmov %%rax, %0\n" :"=r"(ctx->rflags) : :"%rax" );
+	asm volatile("pushfq ; popq %0;" : "=rm" (ctx->rflags) : : "memory");
 
     uint64_t *stack_ptr = (uint64_t *)((uint8_t *)stack + stack_size);
     // TODO(RostakaGmfun): Parameter passing

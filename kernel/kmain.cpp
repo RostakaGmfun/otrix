@@ -9,6 +9,7 @@
 #include "dev/pci.h"
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
+#include "kernel/kmem.h"
 #include <cstring>
 #include <cstdio>
 
@@ -35,6 +36,8 @@ static pci_descriptor_t pci_devices[] = {
     */
 };
 
+static kmem_heap_t root_heap;
+
 static void init_heap()
 {
     extern uint32_t *__multiboot_addr;
@@ -46,9 +49,12 @@ static void init_heap()
             case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO: {
                 const uint64_t mem_low_size = ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower;
                 extern uint64_t __binary_end;
-                const uint64_t mem_high_start = (uint64_t)&__binary_end;
-                const uint64_t mem_high_size = ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper;
-                immediate_console::print("Low mem size %d kb, Upper mem start 0x%08x, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size, tag->size);
+                void *mem_high_start = &__binary_end;
+                const uint64_t mem_high_size_kb = ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper;
+                immediate_console::print("Low mem size %d kb, Upper mem start 0x016%p, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size_kb, tag->size);
+                // For debugging
+                memset(mem_high_start, 0xa5, mem_high_size_kb);
+                kmem_init(&root_heap, mem_high_start, mem_high_size_kb * 1024);
                 return;
             }
             break;
@@ -62,11 +68,12 @@ static void init_heap()
 extern "C" __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
-    init_heap();
-    otrix::arch::init_identity_mapping();
+    // ACPI should be parsed before heap because it is located in usable RAM.
     if (EOK != acpi_init()) {
         immediate_console::print("Failed to parse ACPI tables\n");
     }
+    init_heap();
+    otrix::arch::init_identity_mapping();
     otrix::arch::pic_init(32, 40);
     otrix::arch::pic_disable();
     otrix::arch::irq_manager::init();
@@ -80,16 +87,26 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     local_apic::start_timer(0x1);
 
     const int max_devices = 16;
-    static pci_device devices[max_devices];
+    pci_device *devices = (pci_device *)kmem_alloc(&root_heap, sizeof(pci_device) * max_devices);
+    kASSERT(nullptr != devices);
+    memset((void *)devices, 0, sizeof(pci_device) * max_devices);
     int num_devices = 0;
     pci_enumerate_devices(devices, max_devices, &num_devices);
+    immediate_console::print("Devices enumerated: %d\n", num_devices);
     for (int i = 0; i < num_devices; i++) {
         immediate_console::print("PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
                 devices[i].bus_no, devices[i].dev_no, devices[i].device_id, devices[i].vendor_id,
                 devices[i].device_class, devices[i].device_subclass, devices[i].subsystem_id,
                 devices[i].subsystem_vendor_id);
-        immediate_console::print("    BAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
+        immediate_console::print("\tBAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
                 devices[i].BAR0, devices[i].BAR1, devices[i].BAR2, devices[i].BAR3, devices[i].BAR4, devices[i].BAR5);
+        immediate_console::print("\tCapabilities:\n");
+        for (int j = 0; j < PCI_CFG_NUM_CAPABILITIES; j++) {
+            if (0 == devices[i].capabilities[j].id) {
+                break;
+            }
+            immediate_console::print("\t\tCAP %02x %02x\n", devices[i].capabilities[j].id, devices[i].capabilities[j].offset);
+        }
     }
 
     pci_probe(pci_devices, sizeof(pci_devices) / sizeof(pci_devices[0]));
@@ -109,13 +126,10 @@ extern "C" __attribute__((noreturn)) void kmain(void)
                 while (1);
             });
 
-    immediate_console::print("Adding thread 1\n");
     kthread_scheduler::add_thread(thread1);
-    immediate_console::print("Added thread 1\n");
     kthread_scheduler::add_thread(thread2);
-    immediate_console::print("Added thread 2\n");
 
-    //kthread_scheduler::schedule();
     otrix::arch::irq_manager::print_irq();
+    kthread_scheduler::schedule();
     while (1);
 }

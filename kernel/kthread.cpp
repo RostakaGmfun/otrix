@@ -18,7 +18,7 @@ kthread::kthread(uint64_t *stack, size_t stack_size, kthread_entry entry):
 {
     static int largest_id = 1;
     id_ = largest_id++;
-    arch_context_setup(&context_, &stack_,
+    arch_context_setup(&context_, stack_,
             stack_size, entry_);
 }
 
