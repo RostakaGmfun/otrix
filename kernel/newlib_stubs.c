@@ -42,6 +42,7 @@ int kill()
 
 void _exit(int arg)
 {
+    (void)arg;
     kASSERT(0);
 }
 

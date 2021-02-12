@@ -22,30 +22,6 @@ namespace otrix::arch
 alignas(16) irq_manager::idt irq_manager::idt_table[irq_manager::NUM_IRQ];
 irq_manager::irq_entry irq_manager::irq_table[irq_manager::NUM_IRQ];
 
-static const char *exception_names[] = {
-    "divide_error",
-    "debug",
-    "nmi",
-    "breakpoint",
-    "overflow",
-    "bound_range_exceeded",
-    "invalid_opcode",
-    "device_not_available",
-    "double_fault",
-    "coprocessor_segment_overrun",
-    "invalid_tss",
-    "segment_not_present",
-    "stack_fault",
-    "general_protection",
-    "page_fault",
-    "reserved_exception15",
-    "fpu_fp_error",
-    "alignment_check",
-    "machine_check",
-    "simd_fp_exception",
-    "virtualization_exception",
-};
-
 void irq_manager::init()
 {
     for (int i = 0; i < NUM_IRQ; i++) {
@@ -86,7 +62,6 @@ void irq_manager::free_irq(int irq)
 
 void irq_manager::print_irq()
 {
-    char buff[64];
     immediate_console::print("IRQ table:\n");
     for (int i = FIRST_USER_IRQ_NUM; i < NUM_IRQ; i++) {
         if (irq_table[i].allocated) {

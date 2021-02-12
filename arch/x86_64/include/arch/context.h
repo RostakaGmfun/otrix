@@ -33,7 +33,7 @@ extern void arch_context_restore(const struct arch_context *context);
 
 static inline void arch_context_setup(struct arch_context *ctx,
         const void * const stack, const size_t stack_size,
-        void(*entry)(void *), void * const params)
+        void(*entry)(void))
 {
     kASSERT(ctx != NULL && entry != NULL);
 

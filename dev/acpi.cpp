@@ -104,7 +104,7 @@ static struct
 static error_t acpi_validate_checksum(const struct acpi_sdt_hdr *sdt)
 {
     uint8_t checksum = 0;
-    for (int i = 0; i < sdt->length; i++) {
+    for (uint32_t i = 0; i < sdt->length; i++) {
         checksum += ((const uint8_t *)sdt)[i];
     }
 

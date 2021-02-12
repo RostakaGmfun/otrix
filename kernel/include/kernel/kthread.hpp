@@ -11,7 +11,7 @@ namespace otrix
 {
 
 // TODO(RostakaGmfun): Add more type safety
-using kthread_entry = void(*)(void *);
+using kthread_entry = void(*)();
 
 /**
  * Represents a single-core kernel cooperating threads (fibers).

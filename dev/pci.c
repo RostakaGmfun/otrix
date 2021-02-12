@@ -109,7 +109,7 @@ static inline error_t pci_config_read_buffer(const uint8_t bus,
 
     aligned_addr += 4;
 
-    for (int i = 0; i < size / 4; i++) {
+    for (size_t i = 0; i < size / 4; i++) {
         *((uint32_t *)buffer) = pci_config_read32(bus, dev, fun, aligned_addr);
         buffer += 4;
         aligned_addr += 4;
@@ -117,7 +117,7 @@ static inline error_t pci_config_read_buffer(const uint8_t bus,
 
     if (size % 4 != 0) {
         const uint32_t last_word = pci_config_read32(bus, dev, fun, aligned_addr);
-        for (int i = 0; i < size % 4; i++) {
+        for (size_t i = 0; i < size % 4; i++) {
             *buffer++ = (last_word >> (i * 8)) & 0xFF;
         }
 
@@ -142,8 +142,9 @@ static error_t pci_read_device_capabilities(struct pci_device * const device)
     do {
         device->capabilities[cap].id = pci_config_read8(device->bus_no,
                 device->dev_no, device->function, device->cap_ptr + PCI_CAP_ID);
-        device->capabilities[cap].offset = pci_config_read8(device->bus_no,
+        next = pci_config_read8(device->bus_no,
                 device->dev_no, device->function, device->cap_ptr + PCI_CAP_NEXT);
+        device->capabilities[cap].offset = next;
         cap++;
     } while (next != 0x00);
 
@@ -266,7 +267,7 @@ error_t pci_read_capability(const struct pci_device * const device,
 
     const size_t num_caps = sizeof(device->capabilities) /
         sizeof(struct pci_capability);
-    for (int i = 0; i < num_caps; i++) {
+    for (size_t i = 0; i < num_caps; i++) {
         if (device->capabilities[i].id == cap_id) {
             pci_config_read_buffer(device->bus_no, device->dev_no,
                     device->function,

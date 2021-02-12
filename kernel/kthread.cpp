@@ -14,12 +14,12 @@ kthread::kthread(): stack_(nullptr), stack_size_(0), entry_(nullptr)
 {}
 
 kthread::kthread(uint64_t *stack, size_t stack_size, kthread_entry entry):
-    entry_(entry), stack_(stack), stack_size_(stack_size)
+    stack_(stack), stack_size_(stack_size), entry_(entry)
 {
     static int largest_id = 1;
     id_ = largest_id++;
     arch_context_setup(&context_, &stack_,
-            stack_size, entry_, nullptr);
+            stack_size, entry_);
 }
 
 kthread::kthread(kthread &&other)

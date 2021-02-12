@@ -37,7 +37,7 @@ void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
     uint8_t *p_after = (uint8_t *)p_block + sizeof(kmem_used_block_t) + size;
 
     if (p_free == heap_desc->free_list) {
-        if ((uint8_t *)heap_desc->start + heap_desc->size - p_after < sizeof(kmem_free_block_t)) {
+        if ((uint8_t *)heap_desc->start + heap_desc->size - p_after < (long int)sizeof(kmem_free_block_t)) {
             heap_desc->free_list = NULL;
         } else {
             kmem_free_block_t *new_free = (kmem_free_block_t *)p_after;
@@ -47,7 +47,7 @@ void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
         }
     } else {
         // Sufficient space to allocate another free block?
-        if ((uint8_t *)heap_desc->start + heap_desc->size - p_after > sizeof(kmem_free_block_t)) {
+        if ((uint8_t *)heap_desc->start + heap_desc->size - p_after > (long int)sizeof(kmem_free_block_t)) {
             struct intrusive_list *prev = prev = p_free->prev;
             kmem_free_block_t *new_free = (kmem_free_block_t *)p_after;
             intrusive_list_init(&new_free->list_node);

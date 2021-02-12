@@ -39,13 +39,11 @@ static void init_heap()
 {
     extern uint32_t *__multiboot_addr;
     uint64_t addr = (uint64_t)__multiboot_addr & 0xFFFFFFFF;
-    uint64_t size = *(uint64_t *) addr;
     struct multiboot_tag *tag;
     for (tag = (struct multiboot_tag *) (addr + 8); tag->type != MULTIBOOT_TAG_TYPE_END; tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag + ((tag->size + 7) & ~7))) {
         switch (tag->type)
             {
             case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO: {
-                const uint64_t mem_low_start = 0;
                 const uint64_t mem_low_size = ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower;
                 extern uint64_t __binary_end;
                 const uint64_t mem_high_start = (uint64_t)&__binary_end;
@@ -97,14 +95,14 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     pci_probe(pci_devices, sizeof(pci_devices) / sizeof(pci_devices[0]));
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
-            [](void *a) {
+            []() {
                 immediate_console::print("Task1\n");
                 kthread_scheduler::get_current_thread().yield();
                 while (1);
             });
 
     auto thread2 = kthread(t2_stack, sizeof(t2_stack),
-            [](void *a) {
+            []() {
                 immediate_console::print("Task2\n");
                 kthread_scheduler::get_current_thread().yield();
                 immediate_console::print("after yield\n");
