@@ -5,11 +5,15 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define PCI_CFG_NUM_CAPABILITIES 16
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define PCI_CFG_NUM_CAPABILITIES 16
+
+#define PCI_CAP_ID_NULL   0x00
+#define PCI_CAP_ID_MSIX   0x11
+#define PCI_CAP_ID_VENDOR 0x09
 
 struct pci_capability
 {
@@ -31,12 +35,7 @@ struct pci_device
     uint8_t revision_id;
     uint16_t subsystem_id;
     uint16_t subsystem_vendor_id;
-    uint32_t BAR0;
-    uint32_t BAR1;
-    uint32_t BAR2;
-    uint32_t BAR3;
-    uint32_t BAR4;
-    uint32_t BAR5;
+    uint32_t BAR[6];
     uint8_t cap_ptr;
     struct pci_capability capabilities[PCI_CFG_NUM_CAPABILITIES];
 };
@@ -76,6 +75,14 @@ error_t pci_read_capability(const struct pci_device * const device,
 error_t pci_enumerate_devices(struct pci_device *devices, int array_size, int *num_devs_found);
 
 error_t pci_probe(const struct pci_descriptor_t *p_desc, int num_desc);
+
+uint32_t pci_dev_read32(const struct pci_device *device, uint8_t reg);
+uint16_t pci_dev_read16(const struct pci_device *device, uint8_t reg);
+uint8_t pci_dev_read8(const struct pci_device *device, uint8_t reg);
+
+void pci_dev_write32(const struct pci_device *device, uint8_t reg, uint32_t val);
+void pci_dev_write16(const struct pci_device *device, uint8_t reg, uint16_t val);
+void pci_dev_write8(const struct pci_device *device, uint8_t reg, uint8_t val);
 
 #ifdef __cplusplus
 }

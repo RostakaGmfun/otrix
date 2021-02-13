@@ -7,15 +7,12 @@
 #include "dev/acpi.hpp"
 #include "dev/serial.h"
 #include "dev/pci.h"
+#include "dev/virtio.hpp"
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
 #include "kernel/kmem.h"
 #include <cstring>
 #include <cstdio>
-
-#define VIRTIO_VENDOR_ID 0x1AF4
-#define VIRTIO_DEVICE_MIN_ID 0x1000
-#define VIRTIO_DEVICE_MAX_ID 0x103F
 
 static uint64_t t1_stack[1024];
 static uint64_t t2_stack[1024];
@@ -24,17 +21,6 @@ using otrix::immediate_console;
 using otrix::kthread;
 using otrix::kthread_scheduler;
 using otrix::arch::local_apic;
-
-static pci_descriptor_t pci_devices[] = {
-    /*
-    {
-        .name = "virtio-serial",
-        .vendor_id = VIRTIO_PCI_VENDOR_ID,
-        .device_id = VIRTIO_SERIAL_PCI_DEVICE_ID,
-        .prove_fn = virtio_serial_pci_probe,
-    },
-    */
-};
 
 static kmem_heap_t root_heap;
 
@@ -99,7 +85,7 @@ extern "C" __attribute__((noreturn)) void kmain(void)
                 devices[i].device_class, devices[i].device_subclass, devices[i].subsystem_id,
                 devices[i].subsystem_vendor_id);
         immediate_console::print("\tBAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
-                devices[i].BAR0, devices[i].BAR1, devices[i].BAR2, devices[i].BAR3, devices[i].BAR4, devices[i].BAR5);
+                devices[i].BAR[0], devices[i].BAR[1], devices[i].BAR[2], devices[i].BAR[3], devices[i].BAR[4], devices[i].BAR[5]);
         immediate_console::print("\tCapabilities:\n");
         for (int j = 0; j < PCI_CFG_NUM_CAPABILITIES; j++) {
             if (0 == devices[i].capabilities[j].id) {
@@ -107,9 +93,11 @@ extern "C" __attribute__((noreturn)) void kmain(void)
             }
             immediate_console::print("\t\tCAP %02x %02x\n", devices[i].capabilities[j].id, devices[i].capabilities[j].offset);
         }
+        otrix::dev::virtio_dev virtio_dev(&devices[i]);
+        if (virtio_dev.valid()) {
+            virtio_dev.print_info();
+        }
     }
-
-    pci_probe(pci_devices, sizeof(pci_devices) / sizeof(pci_devices[0]));
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             []() {

@@ -71,6 +71,18 @@ static inline uint32_t pci_config_read32(const uint8_t bus, const uint8_t dev,
 }
 
 /**
+ * Read 16-bit value from unaligned address of PCI configuration space.
+ */
+static inline uint16_t pci_config_read16(const uint8_t bus, const uint8_t dev,
+        const uint8_t fun, uint8_t addr)
+{
+    uint8_t aligned_addr = addr & (~0x03);
+
+    const uint32_t data = pci_config_read32(bus, dev, fun, aligned_addr);
+    return (data >> ((addr & 0x01) * 16)) & 0xFFFF;
+}
+
+/**
  * Read byte from unaligned address of PCI configuration space.
  */
 static inline uint8_t pci_config_read8(const uint8_t bus, const uint8_t dev,
@@ -78,8 +90,43 @@ static inline uint8_t pci_config_read8(const uint8_t bus, const uint8_t dev,
 {
     uint8_t aligned_addr = addr & (~0x03);
 
-    uint32_t data = pci_config_read32(bus, dev, fun, aligned_addr);
+    const uint32_t data = pci_config_read32(bus, dev, fun, aligned_addr);
     return (data >> ((addr & 0x03) * 8)) & 0xFF;
+}
+
+/**
+ * Write single 32-bit register from PCI Configuration space
+ * for specified bus, device and function.
+ */
+static inline void pci_config_write32(const uint8_t bus, const uint8_t dev,
+        const uint8_t fun, const uint8_t reg, uint32_t val)
+{
+    arch_io_write32(PCI_CFG_ADDR, PCI_CFG_REG(bus, dev, fun, reg));
+    arch_io_write32(PCI_CFG_DATA, val);
+}
+
+/**
+ * Write 16-bit value to unaligned address of PCI configuration space.
+ */
+static inline void pci_config_write16(const uint8_t bus, const uint8_t dev,
+        const uint8_t fun, uint8_t addr, uint16_t val)
+{
+    uint8_t aligned_addr = addr & (~0x03);
+
+    const uint32_t data = pci_config_read32(bus, dev, fun, aligned_addr);
+    pci_config_write32(bus, dev, fun, aligned_addr, (data & ~(0xffff << ((addr & 0x01) * 16))) | val << ((addr & 0x01) * 16));
+}
+
+/**
+ * Write byte from unaligned address of PCI configuration space.
+ */
+static inline void pci_config_write8(const uint8_t bus, const uint8_t dev,
+        const uint8_t fun, uint8_t addr, uint8_t val)
+{
+    uint8_t aligned_addr = addr & (~0x03);
+
+    const uint32_t data = pci_config_read32(bus, dev, fun, aligned_addr);
+    pci_config_write32(bus, dev, fun, aligned_addr, (data & ~(0xff << ((addr & 0x03) * 8))) | val << ((addr & 0x03) * 8));
 }
 
 /**
@@ -170,17 +217,17 @@ static error_t pci_read_device_config(struct pci_device * const device)
     device->device_subclass = PCI_REG_SUBCLASS(reg);
     device->revision_id = PCI_REG_REVISION_ID(reg);
 
-    device->BAR0 = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR[0] = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR0);
-    device->BAR1 = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR[1] = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR1);
-    device->BAR2 = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR[2] = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR2);
-    device->BAR3 = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR[3] = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR3);
-    device->BAR4 = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR[4] = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR4);
-    device->BAR5 = pci_config_read32(device->bus_no, device->dev_no,
+    device->BAR[5] = pci_config_read32(device->bus_no, device->dev_no,
             device->function, PCI_REG_BAR5);
 
     reg = pci_config_read32(device->bus_no, device->dev_no,
@@ -291,4 +338,34 @@ error_t pci_probe(const struct pci_descriptor_t *p_desc, int num_desc) {
     }
 
     return EOK;
+}
+
+uint32_t pci_dev_read32(const struct pci_device *device, uint8_t reg)
+{
+    return pci_config_read32(device->bus_no, device->dev_no, device->function, reg);
+}
+
+uint16_t pci_dev_read16(const struct pci_device *device, uint8_t reg)
+{
+    return pci_config_read16(device->bus_no, device->dev_no, device->function, reg);
+}
+
+uint8_t pci_dev_read8(const struct pci_device *device, uint8_t reg)
+{
+    return pci_config_read8(device->bus_no, device->dev_no, device->function, reg);
+}
+
+void pci_dev_write32(const struct pci_device *device, uint8_t reg, uint32_t val)
+{
+    pci_config_write32(device->bus_no, device->dev_no, device->function, reg, val);
+}
+
+void pci_dev_write16(const struct pci_device *device, uint8_t reg, uint16_t val)
+{
+    pci_config_write16(device->bus_no, device->dev_no, device->function, reg, val);
+}
+
+void pci_dev_write8(const struct pci_device *device, uint8_t reg, uint8_t val)
+{
+    pci_config_write8(device->bus_no, device->dev_no, device->function, reg, val);
 }
