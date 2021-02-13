@@ -51,6 +51,25 @@ static void init_heap()
     }
 }
 
+namespace otrix {
+
+void *alloc(size_t size)
+{
+    long flags = arch_irq_save();
+    void *ret = kmem_alloc(&root_heap, size);
+    arch_irq_restore(flags);
+    return ret;
+}
+
+void free(void *ptr)
+{
+    long flags = arch_irq_save();
+    kmem_free(&root_heap, ptr);
+    arch_irq_restore(flags);
+}
+
+}
+
 extern "C" __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();

@@ -65,9 +65,11 @@ enum pci_registers
 static inline uint32_t pci_config_read32(const uint8_t bus, const uint8_t dev,
         const uint8_t fun, const uint8_t reg)
 {
+    long flags = arch_irq_save();
     arch_io_write32(PCI_CFG_ADDR, PCI_CFG_REG(bus, dev, fun, reg));
-
-    return arch_io_read32(PCI_CFG_DATA);
+    const uint32_t ret = arch_io_read32(PCI_CFG_DATA);
+    arch_irq_restore(flags);
+    return ret;
 }
 
 /**
@@ -101,8 +103,10 @@ static inline uint8_t pci_config_read8(const uint8_t bus, const uint8_t dev,
 static inline void pci_config_write32(const uint8_t bus, const uint8_t dev,
         const uint8_t fun, const uint8_t reg, uint32_t val)
 {
+    long flags = arch_irq_save();
     arch_io_write32(PCI_CFG_ADDR, PCI_CFG_REG(bus, dev, fun, reg));
     arch_io_write32(PCI_CFG_DATA, val);
+    arch_irq_restore(flags);
 }
 
 /**

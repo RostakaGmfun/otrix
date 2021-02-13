@@ -54,15 +54,15 @@ static inline void arch_enable_interrupts(void)
     asm volatile("sti": : :"memory");
 }
 
-static inline uint64_t arch_irq_save(void)
+static inline long arch_irq_save(void)
 {
-    uint64_t flags = 0;
+    long flags = 0;
 	asm volatile("pushfq ; popq %0;" : "=rm" (flags) : : "memory");
     arch_disable_interrupts();
     return flags;
 }
 
-static inline void  arch_irq_restore(uint64_t flags)
+static inline void arch_irq_restore(long flags)
 {
 	asm volatile("pushq %0 ; popfq" : /* no output */ :"g" (flags) :"memory", "cc");
 }
