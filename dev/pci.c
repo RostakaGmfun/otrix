@@ -221,18 +221,14 @@ static error_t pci_read_device_config(struct pci_device * const device)
     device->device_subclass = PCI_REG_SUBCLASS(reg);
     device->revision_id = PCI_REG_REVISION_ID(reg);
 
-    device->BAR[0] = pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR0);
-    device->BAR[1] = pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR1);
-    device->BAR[2] = pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR2);
-    device->BAR[3] = pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR3);
-    device->BAR[4] = pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR4);
-    device->BAR[5] = pci_config_read32(device->bus_no, device->dev_no,
-            device->function, PCI_REG_BAR5);
+    for (int i = 0; i < 6; i++) {
+        device->BAR[i] = pci_config_read32(device->bus_no, device->dev_no,
+                device->function, PCI_REG_BAR0 + i * 4);
+        if (device->BAR[i] & 1) {
+            // IO space
+            device->BAR[i] &= 0xFFFC;
+        }
+    }
 
     reg = pci_config_read32(device->bus_no, device->dev_no,
                     device->function, PCI_REG_STATUS_COMMAND);

@@ -4,7 +4,6 @@
 #include <cstddef>
 #include "dev/pci.h"
 #include "common/error.h"
-#include "common/list.h"
 
 namespace otrix::dev
 {
@@ -42,31 +41,6 @@ protected:
     uint32_t read_reg(virtio_device_register reg);
     void write_reg(virtio_device_register reg, uint32_t value);
 
-    /**
-     * Create virtqueue with @c index.
-     * This allocates required amount of pages to hold descritor and avail/used rings.
-     * @param[in] index Index of queue to use.
-     * @param[in,out] p_queue_size (In) Max size of queue to create, (out) actual size of queue created.
-     * @retval ENODEV Available queue size is 0.
-     * @retval EOK Queue created
-     */
-    error_t create_virtqueue(uint16_t index, uint16_t *p_queue_size);
-
-private:
-
-    bool valid_;
-
-    struct virtio_pci_cap_t
-    {
-        uint32_t  base;
-        uint32_t offset;
-        uint32_t len;
-    };
-
-    virtio_pci_cap_t caps_[5];
-
-    pci_device *pci_dev_;
-
     struct virtio_descriptor
     {
         uint64_t addr;
@@ -87,8 +61,7 @@ private:
         uint32_t len;
     } __attribute__((packed));
 
-    struct virtqueue {
-        intrusive_list list_node;
+    struct virtq {
         int index;
         uint16_t size;
         void *allocated_mem;
@@ -97,9 +70,41 @@ private:
         uint16_t *avail_ring;
         virtio_ring_hdr *used_ring_hdr;
         virtio_used_elem *used_ring;
+        int num_used_descriptors;
     };
 
-    intrusive_list *virtqueues_;
+    /**
+     * Create virtqueue with @c index.
+     * This allocates required amount of pages to hold descritor and avail/used rings.
+     * @param[in] index Index of queue to use.
+     * @param[in] p_queue_size Max size of queue to create.
+     * @param[out] p_out_virtq Pointer to the created virtqueue handle.
+     * @retval ENODEV Available queue size is 0.
+     * @retval EOK Queue created
+     */
+    error_t virtq_create(uint16_t index, uint16_t size, virtq **p_out_virtq);
+
+    error_t virtq_destroy(virtq *p_vq);
+
+    /**
+     * Add new entry to the descriptor table and put it into the available ring.
+     */
+    error_t virtq_add_buffer(virtq *p_vq, uint64_t *p_buffer, uint32_t buffer_size, bool device_writable);
+
+private:
+
+    bool valid_;
+
+    struct virtio_pci_cap_t
+    {
+        uint32_t  base;
+        uint32_t offset;
+        uint32_t len;
+    };
+
+    virtio_pci_cap_t caps_[5];
+
+    pci_device *pci_dev_;
 };
 
 } // namespace otrix::dev
