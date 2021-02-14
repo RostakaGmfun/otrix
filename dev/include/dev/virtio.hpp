@@ -41,8 +41,6 @@ protected:
     virtual uint32_t read_reg(uint16_t reg);
     virtual void write_reg(uint16_t reg, uint32_t value);
 
-    void begin_init();
-
     struct virtio_descriptor
     {
         uint64_t addr;
@@ -90,9 +88,11 @@ protected:
     /**
      * Add new entry to the descriptor table and put it into the available ring.
      */
-    error_t virtq_add_buffer(virtq *p_vq, uint64_t *p_buffer, uint32_t buffer_size, bool device_writable);
+    error_t virtq_add_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable);
 
     virtual uint32_t negotiate_features(uint32_t device_features);
+
+    void begin_init();
 
     void init_finished();
 

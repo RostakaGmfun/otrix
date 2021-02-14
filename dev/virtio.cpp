@@ -155,11 +155,13 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq)
     p_vq->size = queue_len;
     // 4095 to adjust the descriptor pointer to be 4kb aligned
     // TODO: Instead of relying on root heap allocator implement page allocator
-    p_vq->allocated_mem = otrix::alloc(virtq_size + 4095);
+    const size_t alloc_size = virtq_size + 4095;
+    p_vq->allocated_mem = otrix::alloc(alloc_size);
     if (nullptr == p_vq->allocated_mem) {
         otrix::free(p_vq);
         return ENOMEM;
     }
+    memset(p_vq->allocated_mem, 0, alloc_size);
 
     p_vq->desc_table = reinterpret_cast<virtio_descriptor *>(vq_align((uintptr_t)p_vq->allocated_mem));
     p_vq->avail_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table + descriptor_table_size);
@@ -190,7 +192,7 @@ error_t virtio_dev::virtq_destroy(virtq *p_vq)
     return EOK;
 }
 
-error_t virtio_dev::virtq_add_buffer(virtq *p_vq, uint64_t *p_buffer, uint32_t buffer_size, bool device_writable)
+error_t virtio_dev::virtq_add_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable)
 {
     if (nullptr == p_vq || nullptr == p_buffer || 0 == buffer_size) {
         return EINVAL;
