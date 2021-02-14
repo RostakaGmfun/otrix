@@ -65,11 +65,13 @@ virtio_dev::virtio_dev(pci_device *pci_dev): pci_dev_(pci_dev)
             caps_[cfg_type - 1].len = pci_dev_read32(pci_dev, pci_dev->capabilities[i].offset + 12);
         }
     }
+
     valid_ = true;
 
     write_reg(device_status, 0);
     write_reg(device_status, virtio_device_status::acknowledge | virtio_device_status::driver);
-    write_reg(driver_features, read_reg(device_features) & ~(1 << VIRTIO_F_EVENT_IDX));
+
+    write_reg(driver_features, negotiate_features(read_reg(device_features)));
     immediate_console::print("Device status %02x, features %08x\n", read_reg(device_status), read_reg(device_features));
     int queue_idx = 0;
     uint16_t q_size = 0;
@@ -241,6 +243,16 @@ error_t virtio_dev::virtq_add_buffer(virtq *p_vq, uint64_t *p_buffer, uint32_t b
     }
 
     return EOK;
+}
+
+uint32_t virtio_dev::negotiate_features(uint32_t device_features)
+{
+    return device_features & ~(1 << VIRTIO_F_EVENT_IDX);
+}
+
+void virtio_dev::init_finished()
+{
+    write_reg(device_status, read_reg(device_status) | virtio_device_status::driver_ok);
 }
 
 } // namespace otrix::dev

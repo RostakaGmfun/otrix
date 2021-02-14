@@ -13,7 +13,7 @@ class virtio_dev
 public:
     virtio_dev(pci_device *pci_dev);
 
-    ~virtio_dev();
+    virtual ~virtio_dev();
 
     bool valid() const
     {
@@ -90,6 +90,10 @@ protected:
      * Add new entry to the descriptor table and put it into the available ring.
      */
     error_t virtq_add_buffer(virtq *p_vq, uint64_t *p_buffer, uint32_t buffer_size, bool device_writable);
+
+    virtual uint32_t negotiate_features(uint32_t device_features);
+
+    void init_finished();
 
 private:
 
