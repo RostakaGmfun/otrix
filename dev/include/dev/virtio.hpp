@@ -99,7 +99,6 @@ protected:
     pci_device *pci_dev_;
 
 private:
-
     bool valid_;
     uint32_t features_;
 };

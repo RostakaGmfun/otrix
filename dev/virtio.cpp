@@ -38,6 +38,11 @@ void virtio_dev::begin_init()
     if (pci_dev_->vendor_id != VIRTIO_PCI_VENDOR_ID) {
         return;
     }
+    // MSI-X should be enabled,
+    // because we expect to have MSI-X registers in Virtio configuration struct
+    if (EOK != pci_enable_msix(pci_dev_, true)) {
+        return;
+    }
 
     valid_ = true;
 

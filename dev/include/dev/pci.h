@@ -29,8 +29,6 @@ struct pci_device
     uint8_t function;
     uint16_t device_id;
     uint16_t vendor_id;
-    uint16_t status;
-    uint16_t command;
     uint8_t device_class;
     uint8_t device_subclass;
     uint8_t revision_id;

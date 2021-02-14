@@ -27,14 +27,14 @@ protected:
     uint32_t negotiate_features(uint32_t device_features) override;
 
     enum virtio_net_registers {
-        mac_0 = 0x14,
-        mac_1 = 0x15,
-        mac_2 = 0x16,
-        mac_3 = 0x17,
-        mac_4 = 0x18,
-        mac_5 = 0x19,
-        net_status = 0x1a,
-        max_virtqueue_pairs = 0x1c,
+        mac_0 = 0x18,
+        mac_1 = 0x19,
+        mac_2 = 0x1a,
+        mac_3 = 0x1b,
+        mac_4 = 0x1c,
+        mac_5 = 0x1d,
+        net_status = 0x1e,
+        max_virtqueue_pairs = 0x20,
     };
 
     uint32_t read_reg(uint16_t reg) override;

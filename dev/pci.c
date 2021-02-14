@@ -232,15 +232,14 @@ static error_t pci_read_device_config(struct pci_device * const device)
 
     reg = pci_config_read32(device->bus_no, device->dev_no,
                     device->function, PCI_REG_STATUS_COMMAND);
-    device->status = PCI_REG_STATUS(reg);
-    device->command = PCI_REG_COMMAND(reg);
+    uint16_t status = PCI_REG_STATUS(reg);
 
     reg = pci_config_read32(device->bus_no, device->dev_no,
                     device->function, PCI_REG_SUBSYSTEM);
     device->subsystem_id = PCI_REG_SUBSYSTEM_ID(reg);
     device->subsystem_vendor_id = PCI_REG_SUBSYSTEM_VENDOR_ID(reg);
 
-    if (device->status & PCI_REG_STATUS_CAPLIST) {
+    if (status & PCI_REG_STATUS_CAPLIST) {
         device->cap_ptr = PCI_REG_GET_CAP_PTR(pci_config_read32(device->bus_no,
                         device->dev_no, device->function, PCI_REG_CAP_PTR));
 
@@ -406,14 +405,13 @@ error_t pci_enable_msix(const struct pci_device *device, bool enable)
     if (0 == msix_cap) {
         return ENODEV;
     }
-    uint16_t message_control = pci_dev_read16(device, msix_cap + 0x02);
-    message_control |= (1 << 15);
+    uint32_t message_control = pci_dev_read32(device, msix_cap);
     if (enable) {
-        message_control |= (1 << 15);
+        message_control |= (1 << 31);
     } else {
-        message_control &= ~(1 << 15);
+        message_control &= ~(1 << 31);
     }
-    pci_dev_write16(device, msix_cap + 0x02, message_control);
+    pci_dev_write32(device, msix_cap, message_control);
     return EOK;
 }
 
