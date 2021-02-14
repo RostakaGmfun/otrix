@@ -8,6 +8,30 @@
 namespace otrix::dev
 {
 
+enum virtio_net_features
+{
+    VIRTIO_NET_F_CSUM = 0,
+    VIRTIO_NET_F_GUEST_CSUM = 1,
+    VIRTIO_NET_F_CTRL_GUEST_OFFLOADS = 2,
+    VIRTIO_NET_F_MAC = 5,
+    VIRTIO_NET_F_GUEST_TSO4 = 7,
+    VIRTIO_NET_F_GUEST_TSO6 = 8,
+    VIRTIO_NET_F_GUEST_ECN = 9,
+    VIRTIO_NET_F_GUEST_UFO = 10,
+    VIRTIO_NET_F_HOST_TSO4 = 11,
+    VIRTIO_NET_F_HOST_TSO6 = 12,
+    VIRTIO_NET_F_HOST_ECN = 13,
+    VIRTIO_NET_F_HOST_UFO = 14,
+    VIRTIO_NET_F_MRG_RXBUF = 15,
+    VIRTIO_NET_F_STATUS = 16,
+    VIRTIO_NET_F_CTRL_VQ = 17,
+    VIRTIO_NET_F_CTRL_RX = 18,
+    VIRTIO_NET_F_CTRL_VLAN = 19,
+    VIRTIO_NET_F_GUEST_ANNOUNCE = 21,
+    VIRTIO_NET_F_MQ = 22,
+    VIRTIO_NET_F_CTRL_MAC_ADDR = 23,
+};
+
 using otrix::immediate_console;
 
 virtio_net::virtio_net(pci_device *pci_dev): virtio_dev(pci_dev)
@@ -24,11 +48,6 @@ virtio_net::virtio_net(pci_device *pci_dev): virtio_dev(pci_dev)
         immediate_console::print("Failed to create RX queue\n");
     }
 
-    ret = virtq_create(2, &control_q_);
-    if (EOK != ret) {
-        immediate_console::print("Failed to create Control queue\n");
-    }
-
     init_finished();
 }
 
@@ -39,9 +58,6 @@ virtio_net::~virtio_net()
     }
     if (nullptr != rx_q_) {
         virtq_destroy(rx_q_);
-    }
-    if (nullptr != control_q_) {
-        virtq_destroy(control_q_);
     }
 }
 
@@ -66,7 +82,11 @@ void virtio_net::get_mac(uint8_t (&mac)[6])
 
 uint32_t virtio_net::negotiate_features(uint32_t device_features)
 {
-    return device_features;
+    const uint32_t supported_features = (1 << VIRTIO_NET_F_MAC) | (1 << VIRTIO_NET_F_STATUS);
+    if ((supported_features & device_features) != supported_features) {
+        immediate_console::print("Failed to negotiate required features: %08x, %08x\n", supported_features, device_features);
+    }
+    return (device_features & 0xFF000000) | (device_features & supported_features);
 }
 
 uint32_t virtio_net::read_reg(uint16_t reg)

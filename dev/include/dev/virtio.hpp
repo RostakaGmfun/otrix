@@ -101,6 +101,7 @@ protected:
 private:
 
     bool valid_;
+    uint32_t features_;
 };
 
 } // namespace otrix::dev

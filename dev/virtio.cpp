@@ -44,7 +44,8 @@ void virtio_dev::begin_init()
     write_reg(device_status, 0);
     write_reg(device_status, virtio_device_status::acknowledge | virtio_device_status::driver);
 
-    write_reg(driver_features, negotiate_features(read_reg(device_features)));
+    features_ = negotiate_features(read_reg(device_features));
+    write_reg(driver_features, features_);
 }
 
 virtio_dev::~virtio_dev()
@@ -53,7 +54,7 @@ virtio_dev::~virtio_dev()
 
 void virtio_dev::print_info()
 {
-    immediate_console::print("Device status %02x, features %08x\n", read_reg(device_status), read_reg(device_features));
+    immediate_console::print("Device status %02x, features %08x\n", read_reg(device_status), features_);
     int queue_idx = 0;
     uint16_t q_size = 0;
     immediate_console::print("VQs: ");

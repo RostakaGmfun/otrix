@@ -43,7 +43,6 @@ protected:
 private:
     virtq *tx_q_;
     virtq *rx_q_;
-    virtq *control_q_;
 };
 
 } // namespace otrix::dev
