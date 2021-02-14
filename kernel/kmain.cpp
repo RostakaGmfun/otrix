@@ -8,6 +8,7 @@
 #include "dev/serial.h"
 #include "dev/pci.h"
 #include "dev/virtio.hpp"
+#include "dev/virtio_net.hpp"
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
 #include "kernel/kmem.h"
@@ -112,9 +113,9 @@ extern "C" __attribute__((noreturn)) void kmain(void)
             }
             immediate_console::print("\t\tCAP %02x %02x\n", devices[i].capabilities[j].id, devices[i].capabilities[j].offset);
         }
-        otrix::dev::virtio_dev virtio_dev(&devices[i]);
-        if (virtio_dev.valid()) {
-            virtio_dev.print_info();
+        if (otrix::dev::virtio_net::is_virtio_net_device(&devices[i])) {
+            otrix::dev::virtio_net virtio_net(&devices[i]);
+            virtio_net.print_info();
         }
     }
 

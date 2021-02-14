@@ -8,18 +8,6 @@
 #include "otrix/immediate_console.hpp"
 #include "kernel/alloc.hpp"
 
-
-/* Common configuration */
-#define VIRTIO_PCI_CAP_COMMON_CFG 1
-/* Notifications */
-#define VIRTIO_PCI_CAP_NOTIFY_CFG 2
-/* ISR Status */
-#define VIRTIO_PCI_CAP_ISR_CFG    3
-/* Device specific configuration */
-#define VIRTIO_PCI_CAP_DEVICE_CFG 4
-/* PCI configuration access */
-#define VIRTIO_PCI_CAP_PCI_CFG    5
-
 #define VIRTIO_PCI_VENDOR_ID 0x1af4
 
 #define VIRTIO_F_EVENT_IDX 29
@@ -43,27 +31,12 @@ enum virtio_device_status
 using otrix::immediate_console;
 
 virtio_dev::virtio_dev(pci_device *pci_dev): pci_dev_(pci_dev)
-{
-    if (pci_dev->vendor_id != VIRTIO_PCI_VENDOR_ID) {
-        return;
-    }
-    for (int i = 0; i < PCI_CFG_NUM_CAPABILITIES; i++) {
-        if (PCI_CAP_ID_VENDOR == pci_dev->capabilities[i].id) {
-            const uint8_t cfg_type = pci_dev_read8(pci_dev, pci_dev->capabilities[i].offset + 3);
-            if (cfg_type < 1 || cfg_type > 5) {
-                immediate_console::print("Unknown Virtio cfg_type=%d\n", cfg_type);
-            continue;
-        }
+{}
 
-        const uint8_t bar = pci_dev_read8(pci_dev, pci_dev->capabilities[i].offset + 4);
-        if (bar > 5) {
-            immediate_console::print("Wrong BAR id: %d\n", bar);
-            continue;
-            }
-            caps_[cfg_type - 1].base = pci_dev->BAR[bar];
-            caps_[cfg_type - 1].offset = pci_dev_read32(pci_dev, pci_dev->capabilities[i].offset + 8);
-            caps_[cfg_type - 1].len = pci_dev_read32(pci_dev, pci_dev->capabilities[i].offset + 12);
-        }
+void virtio_dev::begin_init()
+{
+    if (pci_dev_->vendor_id != VIRTIO_PCI_VENDOR_ID) {
+        return;
     }
 
     valid_ = true;
@@ -72,6 +45,14 @@ virtio_dev::virtio_dev(pci_device *pci_dev): pci_dev_(pci_dev)
     write_reg(device_status, virtio_device_status::acknowledge | virtio_device_status::driver);
 
     write_reg(driver_features, negotiate_features(read_reg(device_features)));
+}
+
+virtio_dev::~virtio_dev()
+{
+}
+
+void virtio_dev::print_info()
+{
     immediate_console::print("Device status %02x, features %08x\n", read_reg(device_status), read_reg(device_features));
     int queue_idx = 0;
     uint16_t q_size = 0;
@@ -91,19 +72,7 @@ virtio_dev::virtio_dev(pci_device *pci_dev): pci_dev_(pci_dev)
     immediate_console::print("\n");
 }
 
-virtio_dev::~virtio_dev()
-{
-}
-
-void virtio_dev::print_info()
-{
-    immediate_console::print("Virtio capabilities:\n");
-    for (int i = 0; i < 5; i++) {
-        immediate_console::print("CAP%d @ %p, len %d\n", i + 1, caps_[i].base + caps_[i].offset, caps_[i].len);
-    }
-}
-
-uint32_t virtio_dev::read_reg(virtio_device_register reg)
+uint32_t virtio_dev::read_reg(uint16_t reg)
 {
     switch (reg) {
     case device_features:
@@ -125,36 +94,34 @@ uint32_t virtio_dev::read_reg(virtio_device_register reg)
     }
 }
 
-void virtio_dev::write_reg(virtio_device_register reg, uint32_t value)
+void virtio_dev::write_reg(uint16_t reg, uint32_t value)
 {
     switch (reg) {
     case device_features:
     case driver_features:
     case queue_address:
-        return arch_io_write32(pci_dev_->BAR[0] + reg, value);
+        arch_io_write32(pci_dev_->BAR[0] + reg, value);
+        break;
     case queue_size:
     case queue_select:
     case queue_notify:
-        return arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        break;
     case device_status:
     case isr_status:
-        return arch_io_write8(pci_dev_->BAR[0] + reg, value);
+        arch_io_write8(pci_dev_->BAR[0] + reg, value);
+        break;
     case config_msix_vector:
     case queue_msix_vector:
-        return arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        break;
     }
 }
 
-error_t virtio_dev::virtq_create(uint16_t index, uint16_t size, virtq **p_out_virtq)
+error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq)
 {
     write_reg(queue_select, index);
-    const uint16_t max_queue_size = read_reg(queue_size);
-    if (0 == max_queue_size) {
-        return ENODEV;
-    }
-
-    const uint16_t queue_len = std::min(size, max_queue_size);
-    write_reg(queue_size, queue_len);
+    const uint16_t queue_len = read_reg(queue_size);
 
     const size_t descriptor_table_size = sizeof(virtio_descriptor) * queue_len;
     const size_t available_ring_size = sizeof(virtio_ring_hdr) + sizeof(uint16_t) * queue_len;
@@ -204,7 +171,6 @@ error_t virtio_dev::virtq_destroy(virtq *p_vq)
     }
 
     write_reg(queue_select, p_vq->index);
-    write_reg(queue_size, 0);
     write_reg(queue_address, 0);
 
     otrix::free(p_vq->allocated_mem);

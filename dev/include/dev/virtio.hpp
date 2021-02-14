@@ -38,8 +38,10 @@ protected:
         queue_msix_vector  = 0x16,
     };
 
-    uint32_t read_reg(virtio_device_register reg);
-    void write_reg(virtio_device_register reg, uint32_t value);
+    virtual uint32_t read_reg(uint16_t reg);
+    virtual void write_reg(uint16_t reg, uint32_t value);
+
+    void begin_init();
 
     struct virtio_descriptor
     {
@@ -77,12 +79,11 @@ protected:
      * Create virtqueue with @c index.
      * This allocates required amount of pages to hold descritor and avail/used rings.
      * @param[in] index Index of queue to use.
-     * @param[in] p_queue_size Max size of queue to create.
      * @param[out] p_out_virtq Pointer to the created virtqueue handle.
      * @retval ENODEV Available queue size is 0.
      * @retval EOK Queue created
      */
-    error_t virtq_create(uint16_t index, uint16_t size, virtq **p_out_virtq);
+    error_t virtq_create(uint16_t index, virtq **p_out_virtq);
 
     error_t virtq_destroy(virtq *p_vq);
 
@@ -95,20 +96,11 @@ protected:
 
     void init_finished();
 
+    pci_device *pci_dev_;
+
 private:
 
     bool valid_;
-
-    struct virtio_pci_cap_t
-    {
-        uint32_t  base;
-        uint32_t offset;
-        uint32_t len;
-    };
-
-    virtio_pci_cap_t caps_[5];
-
-    pci_device *pci_dev_;
 };
 
 } // namespace otrix::dev
