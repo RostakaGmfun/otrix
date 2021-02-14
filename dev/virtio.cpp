@@ -70,6 +70,11 @@ void virtio_dev::print_info()
         }
     } while (queue_idx != 0);
     immediate_console::print("\n");
+    uint64_t msix_table_addr = 0;
+    uint32_t msix_table_size = 0;
+    pci_get_msix_table_address(pci_dev_, &msix_table_addr);
+    pci_get_msix_table_size(pci_dev_, &msix_table_size);
+    immediate_console::print("MSIX table @ %p, size %d\n", msix_table_addr, msix_table_size);
 }
 
 uint32_t virtio_dev::read_reg(uint16_t reg)

@@ -369,3 +369,81 @@ void pci_dev_write8(const struct pci_device *device, uint8_t reg, uint8_t val)
 {
     pci_config_write8(device->bus_no, device->dev_no, device->function, reg, val);
 }
+
+error_t pci_enable_bus_mastering(const struct pci_device *device, bool enable)
+{
+    if (NULL == device) {
+        return EINVAL;
+    }
+    uint32_t command_status = pci_dev_read32(device, PCI_REG_STATUS_COMMAND);
+    if (enable) {
+        command_status |= (1 << 2);
+    } else {
+        command_status &= ~(1 << 2);
+    }
+    pci_dev_write32(device, PCI_REG_STATUS_COMMAND, command_status);
+    return EOK;
+}
+
+static uint8_t pci_get_msix_cap(const struct pci_device *device)
+{
+    uint8_t msix_cap = 0;
+    for (int i = 0; i < PCI_CFG_NUM_CAPABILITIES; i++) {
+        if (device->capabilities[i].id == PCI_CAP_ID_MSIX) {
+            msix_cap = device->capabilities[i].offset;
+            break;
+        }
+    }
+    return msix_cap;
+}
+
+error_t pci_enable_msix(const struct pci_device *device, bool enable)
+{
+    if (NULL == device) {
+        return EINVAL;
+    }
+    uint8_t msix_cap = pci_get_msix_cap(device);
+    if (0 == msix_cap) {
+        return ENODEV;
+    }
+    uint16_t message_control = pci_dev_read16(device, msix_cap + 0x02);
+    message_control |= (1 << 15);
+    if (enable) {
+        message_control |= (1 << 15);
+    } else {
+        message_control &= ~(1 << 15);
+    }
+    pci_dev_write16(device, msix_cap + 0x02, message_control);
+    return EOK;
+}
+
+error_t pci_get_msix_table_address(const struct pci_device *device, uint64_t *p_addr)
+{
+    if (NULL == device || NULL == p_addr) {
+        return EINVAL;
+    }
+    uint8_t msix_cap = pci_get_msix_cap(device);
+    if (0 == msix_cap) {
+        return ENODEV;
+    }
+
+    const uint32_t table_addr = pci_dev_read32(device, msix_cap + 0x08);
+    const uint32_t base_addr = device->BAR[table_addr & 0x7];
+    *p_addr = base_addr + (table_addr & ~0x7);
+    return EOK;
+}
+
+error_t pci_get_msix_table_size(const struct pci_device *device, uint32_t *p_size)
+{
+    if (NULL == device || NULL == p_size) {
+        return EINVAL;
+    }
+    uint8_t msix_cap = pci_get_msix_cap(device);
+    if (0 == msix_cap) {
+        return ENODEV;
+    }
+
+    const uint16_t message_control = pci_dev_read16(device, msix_cap + 0x02);
+    *p_size = (message_control & 0x3FF) + 1;
+    return EOK;
+}

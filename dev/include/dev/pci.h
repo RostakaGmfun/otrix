@@ -4,6 +4,7 @@
 #include "common/error.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,6 +84,11 @@ uint8_t pci_dev_read8(const struct pci_device *device, uint8_t reg);
 void pci_dev_write32(const struct pci_device *device, uint8_t reg, uint32_t val);
 void pci_dev_write16(const struct pci_device *device, uint8_t reg, uint16_t val);
 void pci_dev_write8(const struct pci_device *device, uint8_t reg, uint8_t val);
+
+error_t pci_enable_bus_mastering(const struct pci_device *device, bool enable);
+error_t pci_enable_msix(const struct pci_device *device, bool enable);
+error_t pci_get_msix_table_address(const struct pci_device *device, uint64_t *p_addr);
+error_t pci_get_msix_table_size(const struct pci_device *device, uint32_t *p_size);
 
 #ifdef __cplusplus
 }
