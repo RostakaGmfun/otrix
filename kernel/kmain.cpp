@@ -9,6 +9,7 @@
 #include "dev/pci.h"
 #include "dev/virtio.hpp"
 #include "dev/virtio_net.hpp"
+#include "dev/virtio_console.hpp"
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
 #include "kernel/kmem.h"
@@ -116,6 +117,10 @@ extern "C" __attribute__((noreturn)) void kmain(void)
         if (otrix::dev::virtio_net::is_virtio_net_device(&devices[i])) {
             otrix::dev::virtio_net virtio_net(&devices[i]);
             virtio_net.print_info();
+        }
+        if (otrix::dev::virtio_console::is_virtio_console_device(&devices[i])) {
+            otrix::dev::virtio_console virtio_console(&devices[i]);
+            virtio_console.print_info();
         }
     }
 

@@ -32,18 +32,28 @@ enum virtio_net_features
     VIRTIO_NET_F_CTRL_MAC_ADDR = 23,
 };
 
+struct virtio_net_hdr
+{
+    uint8_t flags;
+    uint8_t gso_type;
+    uint16_t hdr_len;
+    uint16_t gso_size;
+    uint16_t csum_start;
+    uint16_t csum_offset;
+} __attribute__((packed));
+
 using otrix::immediate_console;
 
 virtio_net::virtio_net(pci_device *pci_dev): virtio_dev(pci_dev)
 {
     begin_init();
 
-    error_t ret = virtq_create(0, &tx_q_);
+    error_t ret = virtq_create(1, &tx_q_);
     if (EOK != ret) {
         immediate_console::print("Failed to create TX queue\n");
     }
 
-    ret = virtq_create(1, &rx_q_);
+    ret = virtq_create(0, &rx_q_);
     if (EOK != ret) {
         immediate_console::print("Failed to create RX queue\n");
     }

@@ -143,7 +143,6 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq)
     };
 
     const size_t virtq_size = vq_align(descriptor_table_size + available_ring_size) + vq_align(used_ring_size);
-    (void)virtq_size;
 
     virtq *p_vq = (virtq *)otrix::alloc(sizeof(virtq));
     if (nullptr == p_vq) {
@@ -169,10 +168,11 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq)
     p_vq->used_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table + vq_align(descriptor_table_size + available_ring_size));
     p_vq->used_ring = (virtio_used_elem *)((uint8_t *)p_vq->used_ring_hdr);
 
-    // TODO: make sure virtqueue allocation happens in 32-bit address space
-    write_reg(queue_address, (uintptr_t)p_vq->desc_table & 0xFFFFFFFF);
+    write_reg(queue_address, (uintptr_t)p_vq->desc_table >> 12);
 
     *p_out_virtq = p_vq;
+
+    immediate_console::print("Created VQ%d @ %p\n", p_vq->index, p_vq->desc_table);
 
     return EOK;
 }
