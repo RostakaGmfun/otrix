@@ -192,7 +192,7 @@ error_t virtio_dev::virtq_destroy(virtq *p_vq)
     return EOK;
 }
 
-error_t virtio_dev::virtq_add_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable)
+error_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable)
 {
     if (nullptr == p_vq || nullptr == p_buffer || 0 == buffer_size) {
         return EINVAL;
@@ -204,7 +204,7 @@ error_t virtio_dev::virtq_add_buffer(virtq *p_vq, void *p_buffer, uint32_t buffe
     }
 
     const int idx = p_vq->num_used_descriptors++;
-    virtio_descriptor *p_desc = &p_vq->desc_table[idx];
+    volatile virtio_descriptor *p_desc = &p_vq->desc_table[idx];
     p_desc->addr = (uint64_t)p_buffer;
     p_desc->len = buffer_size;
     p_desc->flags = device_writable ? VIRTQ_DESC_F_WRITE : 0;

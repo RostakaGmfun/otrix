@@ -65,11 +65,11 @@ protected:
         int index;
         uint16_t size;
         void *allocated_mem;
-        virtio_descriptor *desc_table;
-        virtio_ring_hdr *avail_ring_hdr;
-        uint16_t *avail_ring;
-        virtio_ring_hdr *used_ring_hdr;
-        virtio_used_elem *used_ring;
+        volatile virtio_descriptor *desc_table;
+        volatile virtio_ring_hdr *avail_ring_hdr;
+        volatile uint16_t *avail_ring;
+        volatile virtio_ring_hdr *used_ring_hdr;
+        volatile virtio_used_elem *used_ring;
         int num_used_descriptors;
     };
 
@@ -88,7 +88,7 @@ protected:
     /**
      * Add new entry to the descriptor table and put it into the available ring.
      */
-    error_t virtq_add_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable);
+    error_t virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable);
 
     virtual uint32_t negotiate_features(uint32_t device_features);
 
