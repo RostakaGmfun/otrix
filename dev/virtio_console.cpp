@@ -17,7 +17,7 @@ enum virtio_console_features
 
 using otrix::immediate_console;
 
-virtio_console::virtio_console(pci_device *pci_dev): virtio_dev(pci_dev)
+virtio_console::virtio_console(pci_dev *p_dev): virtio_dev(p_dev)
 {
     begin_init();
 
@@ -58,10 +58,10 @@ uint32_t virtio_console::read_reg(uint16_t reg)
     switch (reg) {
     case console_cols:
     case console_rows:
-        return arch_io_read16(pci_dev_->BAR[0] + reg);
+        return arch_io_read16(pci_dev_->bar(0) + reg);
     case console_max_nr_ports:
     case console_emerg_write:
-        return arch_io_read32(pci_dev_->BAR[0] + reg);
+        return arch_io_read32(pci_dev_->bar(0) + reg);
     default:
         return virtio_dev::read_reg(reg);
     }
@@ -72,10 +72,10 @@ void virtio_console::write_reg(uint16_t reg, uint32_t value)
     switch (reg) {
     case console_cols:
     case console_rows:
-        return arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        return arch_io_write16(pci_dev_->bar(0) + reg, value);
     case console_max_nr_ports:
     case console_emerg_write:
-        return arch_io_write32(pci_dev_->BAR[0] + reg, value);
+        return arch_io_write32(pci_dev_->bar(0) + reg, value);
     default:
         return virtio_dev::write_reg(reg, value);
     }

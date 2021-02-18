@@ -44,7 +44,7 @@ struct virtio_net_hdr
 
 using otrix::immediate_console;
 
-virtio_net::virtio_net(pci_device *pci_dev): virtio_dev(pci_dev)
+virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev)
 {
     begin_init();
 
@@ -108,10 +108,10 @@ uint32_t virtio_net::read_reg(uint16_t reg)
     case mac_3:
     case mac_4:
     case mac_5:
-        return arch_io_read8(pci_dev_->BAR[0] + reg);
+        return arch_io_read8(pci_dev_->bar(0) + reg);
     case net_status:
     case max_virtqueue_pairs:
-        return arch_io_read16(pci_dev_->BAR[0] + reg);
+        return arch_io_read16(pci_dev_->bar(0) + reg);
     default:
         return virtio_dev::read_reg(reg);
     }
@@ -126,11 +126,11 @@ void virtio_net::write_reg(uint16_t reg, uint32_t value)
     case mac_3:
     case mac_4:
     case mac_5:
-        arch_io_write8(pci_dev_->BAR[0] + reg, value);
+        arch_io_write8(pci_dev_->bar(0) + reg, value);
         break;
     case net_status:
     case max_virtqueue_pairs:
-        arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        arch_io_write16(pci_dev_->bar(0) + reg, value);
         break;
     default:
         virtio_dev::write_reg(reg, value);

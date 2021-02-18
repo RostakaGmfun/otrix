@@ -30,17 +30,17 @@ enum virtio_device_status
 
 using otrix::immediate_console;
 
-virtio_dev::virtio_dev(pci_device *pci_dev): pci_dev_(pci_dev)
+virtio_dev::virtio_dev(pci_dev *p_dev): pci_dev_(p_dev)
 {}
 
 void virtio_dev::begin_init()
 {
-    if (pci_dev_->vendor_id != VIRTIO_PCI_VENDOR_ID) {
+    if (pci_dev_->vendor_id() != VIRTIO_PCI_VENDOR_ID) {
         return;
     }
     // MSI-X should be enabled,
     // because we expect to have MSI-X registers in Virtio configuration struct
-    if (EOK != pci_enable_msix(pci_dev_, true)) {
+    if (EOK != pci_dev_->enable_msix(true)) {
         return;
     }
 
@@ -76,11 +76,11 @@ void virtio_dev::print_info()
         }
     } while (queue_idx != 0);
     immediate_console::print("\n");
-    uint64_t msix_table_addr = 0;
-    uint32_t msix_table_size = 0;
-    pci_get_msix_table_address(pci_dev_, &msix_table_addr);
-    pci_get_msix_table_size(pci_dev_, &msix_table_size);
-    immediate_console::print("MSIX table @ %p, size %d\n", msix_table_addr, msix_table_size);
+    //uint64_t msix_table_addr = 0;
+    //uint32_t msix_table_size = 0;
+    //pci_get_msix_table_address(pci_dev_, &msix_table_addr);
+    //pci_get_msix_table_size(pci_dev_, &msix_table_size);
+    //immediate_console::print("MSIX table @ %p, size %d\n", msix_table_addr, msix_table_size);
 }
 
 uint32_t virtio_dev::read_reg(uint16_t reg)
@@ -89,17 +89,17 @@ uint32_t virtio_dev::read_reg(uint16_t reg)
     case device_features:
     case driver_features:
     case queue_address:
-        return arch_io_read32(pci_dev_->BAR[0] + reg);
+        return arch_io_read32(pci_dev_->bar(0) + reg);
     case queue_size:
     case queue_select:
     case queue_notify:
-        return arch_io_read16(pci_dev_->BAR[0] + reg);
+        return arch_io_read16(pci_dev_->bar(0) + reg);
     case device_status:
     case isr_status:
-        return arch_io_read8(pci_dev_->BAR[0] + reg);
+        return arch_io_read8(pci_dev_->bar(0) + reg);
     case config_msix_vector:
     case queue_msix_vector:
-        return arch_io_read16(pci_dev_->BAR[0] + reg);
+        return arch_io_read16(pci_dev_->bar(0) + reg);
     default:
         return 0;
     }
@@ -111,20 +111,20 @@ void virtio_dev::write_reg(uint16_t reg, uint32_t value)
     case device_features:
     case driver_features:
     case queue_address:
-        arch_io_write32(pci_dev_->BAR[0] + reg, value);
+        arch_io_write32(pci_dev_->bar(0) + reg, value);
         break;
     case queue_size:
     case queue_select:
     case queue_notify:
-        arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        arch_io_write16(pci_dev_->bar(0) + reg, value);
         break;
     case device_status:
     case isr_status:
-        arch_io_write8(pci_dev_->BAR[0] + reg, value);
+        arch_io_write8(pci_dev_->bar(0) + reg, value);
         break;
     case config_msix_vector:
     case queue_msix_vector:
-        arch_io_write16(pci_dev_->BAR[0] + reg, value);
+        arch_io_write16(pci_dev_->bar(0) + reg, value);
         break;
     }
 }

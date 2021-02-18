@@ -8,15 +8,15 @@ namespace otrix::dev
 class virtio_console final: public virtio_dev
 {
 public:
-    virtio_console(pci_device *pci_dev);
+    virtio_console(pci_dev *p_dev);
     ~virtio_console() override;
 
-    static bool is_virtio_console_device(pci_device *p_dev)
+    static bool is_virtio_console_device(pci_dev *p_dev)
     {
         if (nullptr == p_dev) {
             return false;
         }
-        return p_dev->vendor_id == 0x1af4 && p_dev->device_id == 0x1003;
+        return p_dev->vendor_id() == 0x1af4 && p_dev->device_id() == 0x1003;
     }
 
 protected:

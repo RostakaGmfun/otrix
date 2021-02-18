@@ -6,7 +6,7 @@
 #include "otrix/immediate_console.hpp"
 #include "dev/acpi.hpp"
 #include "dev/serial.h"
-#include "dev/pci.h"
+#include "dev/pci.hpp"
 #include "dev/virtio.hpp"
 #include "dev/virtio_net.hpp"
 #include "dev/virtio_console.hpp"
@@ -72,6 +72,24 @@ void free(void *ptr)
 
 }
 
+enum pci_devices_t {
+    PCI_DEVICE_VIRTIO_NET,
+    PCI_DEVICE_VIRTIO_CONSOLE,
+};
+
+static otrix::dev::pci_dev::descriptor_t pci_dev_list[] = {
+    [PCI_DEVICE_VIRTIO_NET] = {
+        .device_id = 0x1000,
+        .vendor_id = 0x1af4,
+        .p_dev = nullptr,
+    },
+    [PCI_DEVICE_VIRTIO_CONSOLE] = {
+        .device_id = 0x1003,
+        .vendor_id = 0x1af4,
+        .p_dev = nullptr,
+    },
+};
+
 extern "C" __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
@@ -93,35 +111,22 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     arch_enable_interrupts();
     local_apic::start_timer(0x1);
 
-    const int max_devices = 16;
-    pci_device *devices = (pci_device *)kmem_alloc(&root_heap, sizeof(pci_device) * max_devices);
-    kASSERT(nullptr != devices);
-    memset((void *)devices, 0, sizeof(pci_device) * max_devices);
-    int num_devices = 0;
-    pci_enumerate_devices(devices, max_devices, &num_devices);
-    immediate_console::print("Devices enumerated: %d\n", num_devices);
-    for (int i = 0; i < num_devices; i++) {
-        immediate_console::print("PCI device %02x:%02x: device_id %x, vendor_id %x, device_class %d, device_subclass %d, subsystem_id %d, subsystem_vendor_id %d\n",
-                devices[i].bus_no, devices[i].dev_no, devices[i].device_id, devices[i].vendor_id,
-                devices[i].device_class, devices[i].device_subclass, devices[i].subsystem_id,
-                devices[i].subsystem_vendor_id);
-        immediate_console::print("\tBAR0 0x%08x BAR1 0x%08x BAR2 0x%08x BAR3 0x%08x BAR4 0x%08x BAR5 0x%08x\n",
-                devices[i].BAR[0], devices[i].BAR[1], devices[i].BAR[2], devices[i].BAR[3], devices[i].BAR[4], devices[i].BAR[5]);
-        immediate_console::print("\tCapabilities:\n");
-        for (int j = 0; j < PCI_CFG_NUM_CAPABILITIES; j++) {
-            if (0 == devices[i].capabilities[j].id) {
-                break;
-            }
-            immediate_console::print("\t\tCAP %02x %02x\n", devices[i].capabilities[j].id, devices[i].capabilities[j].offset);
-        }
-        if (otrix::dev::virtio_net::is_virtio_net_device(&devices[i])) {
-            otrix::dev::virtio_net virtio_net(&devices[i]);
-            virtio_net.print_info();
-        }
-        if (otrix::dev::virtio_console::is_virtio_console_device(&devices[i])) {
-            otrix::dev::virtio_console virtio_console(&devices[i]);
-            virtio_console.print_info();
-        }
+    otrix::dev::pci_dev::find_devices(pci_dev_list, sizeof(pci_dev_list) / sizeof(pci_dev_list[0]));
+
+    if (nullptr != pci_dev_list[PCI_DEVICE_VIRTIO_NET].p_dev) {
+        otrix::dev::pci_dev *p_dev = pci_dev_list[PCI_DEVICE_VIRTIO_NET].p_dev;
+        p_dev->enable_msix(true);
+        p_dev->print_info();
+        otrix::dev::virtio_net virtio_net(p_dev);
+        virtio_net.print_info();
+    }
+
+    if (nullptr != pci_dev_list[PCI_DEVICE_VIRTIO_CONSOLE].p_dev) {
+        otrix::dev::pci_dev *p_dev = pci_dev_list[PCI_DEVICE_VIRTIO_CONSOLE].p_dev;
+        p_dev->enable_msix(true);
+        p_dev->print_info();
+        otrix::dev::virtio_console virtio_console(p_dev);
+        virtio_console.print_info();
     }
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),

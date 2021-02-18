@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
-#include "dev/pci.h"
+#include "dev/pci.hpp"
 #include "common/error.h"
 
 namespace otrix::dev
@@ -11,7 +11,7 @@ namespace otrix::dev
 class virtio_dev
 {
 public:
-    virtio_dev(pci_device *pci_dev);
+    virtio_dev(pci_dev *p_dev);
 
     virtual ~virtio_dev();
 
@@ -96,7 +96,7 @@ protected:
 
     void init_finished();
 
-    pci_device *pci_dev_;
+    pci_dev *pci_dev_;
 
 private:
     bool valid_;

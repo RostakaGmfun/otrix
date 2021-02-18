@@ -8,17 +8,17 @@ namespace otrix::dev
 class virtio_net final: public virtio_dev
 {
 public:
-    virtio_net(pci_device *pci_dev);
+    virtio_net(pci_dev *p_dev);
     ~virtio_net() override;
 
     void print_info() override;
 
-    static bool is_virtio_net_device(pci_device *p_dev)
+    static bool is_virtio_net_device(pci_dev *p_dev)
     {
         if (nullptr == p_dev) {
             return false;
         }
-        return p_dev->vendor_id == 0x1af4 && p_dev->device_id == 0x1000;
+        return p_dev->vendor_id() == 0x1af4 && p_dev->device_id() == 0x1000;
     }
 
     void get_mac(uint8_t (&mac)[6]);

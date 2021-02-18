@@ -1,3 +1,6 @@
+#include <stddef.h>
+#include "kernel/alloc.hpp"
+
 extern "C"
 {
 
@@ -34,4 +37,30 @@ void __cxa_finalize(void *f)
     (void)f;
 }
 
+}
+
+void *operator new(size_t size) {
+    return otrix::alloc(size);
+}
+
+void *operator new[](size_t size) {
+    return otrix::alloc(size);
+}
+
+void operator delete(void *p) {
+    otrix::free(p);
+}
+
+void operator delete[](void *p) {
+    otrix::free(p);
+}
+
+void operator delete(void *p, size_t size) {
+    (void)size;
+    otrix::free(p);
+}
+
+void operator delete[](void *p, size_t size) {
+    (void)size;
+    otrix::free(p);
 }
