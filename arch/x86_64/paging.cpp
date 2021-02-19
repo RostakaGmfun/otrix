@@ -41,9 +41,11 @@ static uint64_t make_p2_entry_huge(const uint64_t phys_addr)
 
 void init_identity_mapping()
 {
+    uint64_t phys = 0;
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 512; j++) {
-            p2_tables[i][j] = make_p2_entry_huge(j * (2 << 20));
+            p2_tables[i][j] = make_p2_entry_huge(phys);
+            phys += 2 << 20;
         }
         p3_table[i] = make_p3_entry(reinterpret_cast<uint64_t>(p2_tables[i]));
     }
