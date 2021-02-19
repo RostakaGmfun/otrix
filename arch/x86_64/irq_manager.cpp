@@ -6,9 +6,9 @@
 #include <cstdio>
 #include <otrix/immediate_console.hpp>
 
-extern "C" void arch_used_irq_handler();
-extern "C" void arch_unused_irq_handler();
-extern "C" void arch_exception_handler();
+extern "C" void arch_used_irq_handler(void *ctx);
+extern "C" void arch_unused_irq_handler(void *ctx);
+extern "C" void arch_exception_handler(void *ctx);
 
 extern "C" void irq_manager_irq_handler()
 {
@@ -34,7 +34,7 @@ void irq_manager::init()
     asm volatile("lidt %0" : : "m" (idt_table_ptr) : "memory");
 }
 
-int irq_manager::request_irq(irq_handler_t p_handler, const char *p_owner)
+int irq_manager::request_irq(irq_handler_t p_handler, const char *p_owner, void *p_handler_context)
 {
     const auto flags = arch_irq_save();
     int ret = -1;
@@ -44,6 +44,7 @@ int irq_manager::request_irq(irq_handler_t p_handler, const char *p_owner)
             irq_table[i].p_owner = p_owner;
             irq_table[i].counter = 0;
             irq_table[i].handler = p_handler;
+            irq_table[i].p_context = p_handler_context;
             set_entry(arch_used_irq_handler, i);
             ret = i;
             break;
@@ -104,7 +105,7 @@ void irq_manager::irq_handler()
     if (irq_n >= 0 && irq_table[irq_n].allocated) {
         irq_table[irq_n].counter++;
         if (irq_table[irq_n].handler) {
-            irq_table[irq_n].handler();
+            irq_table[irq_n].handler(irq_table[irq_n].p_context);
         }
     }
 

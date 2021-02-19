@@ -115,18 +115,17 @@ extern "C" __attribute__((noreturn)) void kmain(void)
 
     if (nullptr != pci_dev_list[PCI_DEVICE_VIRTIO_NET].p_dev) {
         otrix::dev::pci_dev *p_dev = pci_dev_list[PCI_DEVICE_VIRTIO_NET].p_dev;
-        p_dev->enable_msix(true);
-        p_dev->print_info();
         otrix::dev::virtio_net virtio_net(p_dev);
+        p_dev->print_info();
         virtio_net.print_info();
     }
 
     if (nullptr != pci_dev_list[PCI_DEVICE_VIRTIO_CONSOLE].p_dev) {
         otrix::dev::pci_dev *p_dev = pci_dev_list[PCI_DEVICE_VIRTIO_CONSOLE].p_dev;
-        p_dev->enable_msix(true);
-        p_dev->print_info();
         otrix::dev::virtio_console virtio_console(p_dev);
         virtio_console.print_info();
+        p_dev->print_info();
+        otrix::arch::irq_manager::print_irq();
     }
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),

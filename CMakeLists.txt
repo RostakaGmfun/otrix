@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(otrix C CXX ASM)
 
 set(TARGET_ARCH x86_64)
+set(CMAKE_CXX_STANDARD 17)
 
 #add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-unwind-tables -std=c++17 -fno-rtti>)
 

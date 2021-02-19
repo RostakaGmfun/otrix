@@ -36,7 +36,7 @@ public:
 
     error_t enable_msix(bool enable);
 
-    std::pair<error_t, uint16_t> request_msix(void (*p_handler)(void), const char *p_owner);
+    std::pair<error_t, uint16_t> request_msix(void (*p_handler)(void *), const char *p_owner, void *p_handler_context = nullptr);
 
     void free_msix(uint16_t vector);
 
@@ -89,7 +89,7 @@ private:
         uint32_t vector_control;
     } __attribute__((packed));
 
-    msix_entry_t *msix_table_;
+    volatile msix_entry_t *msix_table_;
     uint16_t msix_table_size_;
 };
 

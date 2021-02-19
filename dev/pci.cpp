@@ -269,7 +269,6 @@ error_t pci_dev::enable_msix(bool enable) {
     if (nullptr != msix_table_) {
         return EOK;
     }
-
     const uint8_t msix_cap = get_cap(PCI_CAP_ID_MSIX);
     if (0 == msix_cap) {
         return ENODEV;
@@ -277,24 +276,32 @@ error_t pci_dev::enable_msix(bool enable) {
 
     uint32_t message_control = cfg_read32(msix_cap);
     if (enable) {
-        message_control |= (1 << 31);
+        cfg_write32(msix_cap, message_control | (1 << 31));
     } else {
-        message_control &= ~(1 << 31);
+        cfg_write32(msix_cap, message_control & ~(1 << 31));
+        return EOK;
     }
-    cfg_write32(msix_cap, message_control);
 
-    const uint32_t table_addr = cfg_read32(msix_cap + 0x08);
-    const uint32_t base_addr = bar(table_addr & 0x7);
+    const uint32_t command_status = cfg_read32(PCI_REG_STATUS_COMMAND);
+    // Disable INTx
+    cfg_write32(PCI_REG_STATUS_COMMAND, command_status | (1 << 10));
+
+    const uint32_t table_addr = cfg_read32(msix_cap + 0x04);
+    const uint32_t base_addr = bar(table_addr & 0x7) & ~0xf;
     msix_table_ = reinterpret_cast<msix_entry_t *>(base_addr + (table_addr & ~0x7));
 
-    msix_table_size_ = (message_control & 0x3FF) + 1;
+    msix_table_size_ = ((message_control >> 16) & 0x3FF) + 1;
 
-    memset(msix_table_, 0, sizeof(msix_entry_t) * msix_table_size_);
+    for (int i = 0; i < msix_table_size_; i++) {
+        msix_table_[i].message_address_low = 0;
+        msix_table_[i].vector_control = 1;
+    }
+    cfg_write32(msix_cap, cfg_read32(msix_cap) | (1 << 30)); // Unmask
 
     return EOK;
 }
 
-std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void), const char *p_owner) {
+std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void *), const char *p_owner, void *p_handler_context) {
     uint16_t msix_vector = 0xFFFF;
 
     if (nullptr == p_handler) {
@@ -307,19 +314,32 @@ std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void), cons
             break;
         }
     }
+
     if (0xFFFF == msix_vector) {
         return {ENOMEM, msix_vector};
     }
 
-    const uint8_t irq = otrix::arch::irq_manager::request_irq(p_handler, p_owner);
+    const uint8_t irq = otrix::arch::irq_manager::request_irq(p_handler, p_owner, p_handler_context);
 
     // RH = 1
+    msix_table_[msix_vector].vector_control = 0x1;
     msix_table_[msix_vector].message_address_low = 0xFEE00000 |
-        (otrix::arch::local_apic::id() << 12) | ( 1 << 3);
+        (otrix::arch::local_apic::id() << 12) | (1 << 3);
+    msix_table_[msix_vector].message_address_high = 0;
     // Edge triggered, fixed
-    msix_table_[msix_vector].message_data = irq;
+    msix_table_[msix_vector].message_data = irq | (1 << 8);
+    msix_table_[msix_vector].vector_control = 0x0;
 
     return {EOK, msix_vector};
+}
+
+void pci_dev::free_msix(uint16_t vector) {
+    if (vector >= msix_table_size_) {
+        return;
+    }
+    msix_table_[vector].vector_control = 1;
+    msix_table_[vector].message_address_low = 0;
+    msix_table_[vector].message_data = 0;
 }
 
 void pci_dev::print_info() const {
@@ -341,7 +361,6 @@ void pci_dev::print_info() const {
         for (uint16_t i = 0; i < msix_table_size_; i++) {
             if (0 != msix_table_[i].message_address_low) {
                 immediate_console::print("\tMSI-X/%d: %d\n", i, msix_table_[i].message_data & 0xFF);
-                break;
             }
         }
     }

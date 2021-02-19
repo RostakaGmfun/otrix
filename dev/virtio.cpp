@@ -38,6 +38,8 @@ void virtio_dev::begin_init()
     if (pci_dev_->vendor_id() != VIRTIO_PCI_VENDOR_ID) {
         return;
     }
+    pci_dev_->enable_bus_mastering(true);
+
     // MSI-X should be enabled,
     // because we expect to have MSI-X registers in Virtio configuration struct
     if (EOK != pci_dev_->enable_msix(true)) {
@@ -129,7 +131,7 @@ void virtio_dev::write_reg(uint16_t reg, uint32_t value)
     }
 }
 
-error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq)
+error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *), void *p_handler_context)
 {
     write_reg(queue_select, index);
     const uint16_t queue_len = read_reg(queue_size);
@@ -172,7 +174,14 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq)
 
     *p_out_virtq = p_vq;
 
-    immediate_console::print("Created VQ%d @ %p\n", p_vq->index, p_vq->desc_table);
+    if (nullptr != p_handler) {
+        auto [err, msix_vector] = pci_dev_->request_msix(p_handler, "VQ", p_handler_context);
+        if (EOK == err) {
+            write_reg(queue_msix_vector, msix_vector);
+        }
+    }
+
+    immediate_console::print("Created VQ%d @ %p, msix %04x\n", p_vq->index, p_vq->desc_table, read_reg(queue_msix_vector));
 
     return EOK;
 }

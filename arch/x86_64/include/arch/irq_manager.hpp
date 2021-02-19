@@ -35,7 +35,7 @@ enum class exception_type
 // Forward declaration
 void irq_manager_irq_manager();
 
-using irq_handler_t = void (*)();
+using irq_handler_t = void (*)(void *);
 
 class irq_manager
 {
@@ -44,7 +44,7 @@ public:
 
     static void init();
 
-    static int request_irq(irq_handler_t p_handler, const char *p_owner);
+    static int request_irq(irq_handler_t p_handler, const char *p_owner, void *p_handler_context = nullptr);
 
     static void free_irq(int irq);
 
@@ -82,6 +82,7 @@ private:
         unsigned int counter;
         const char *p_owner;
         irq_handler_t handler;
+        void *p_context;
     };
 
     static irq_entry irq_table[NUM_IRQ];

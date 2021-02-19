@@ -78,10 +78,13 @@ protected:
      * This allocates required amount of pages to hold descritor and avail/used rings.
      * @param[in] index Index of queue to use.
      * @param[out] p_out_virtq Pointer to the created virtqueue handle.
+     * @param[in] p_handler If not nullptr, MSI-X is enabled for this queue,
+     *                      and the handler will be called when
+     * @parampin] p_handler_context Context for the IRQ handler.
      * @retval ENODEV Available queue size is 0.
      * @retval EOK Queue created
      */
-    error_t virtq_create(uint16_t index, virtq **p_out_virtq);
+    error_t virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *) = nullptr, void *p_handler_context = nullptr);
 
     error_t virtq_destroy(virtq *p_vq);
 
