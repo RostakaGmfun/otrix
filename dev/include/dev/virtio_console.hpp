@@ -19,6 +19,8 @@ public:
         return p_dev->vendor_id() == 0x1af4 && p_dev->device_id() == 0x1003;
     }
 
+    size_t write(const char *data, size_t size);
+
 protected:
     uint32_t negotiate_features(uint32_t device_features) override;
 
@@ -33,6 +35,9 @@ protected:
     void write_reg(uint16_t reg, uint32_t value) override;
 
 private:
+
+    static void tx_irq_handler(void *p_ctx);
+
     virtq *tx_q_;
     virtq *rx_q_;
 };

@@ -296,7 +296,7 @@ error_t pci_dev::enable_msix(bool enable) {
         msix_table_[i].message_address_low = 0;
         msix_table_[i].vector_control = 1;
     }
-    cfg_write32(msix_cap, cfg_read32(msix_cap) | (1 << 30)); // Unmask
+    cfg_write32(msix_cap, cfg_read32(msix_cap) & ~(1 << 30)); // Unmask
 
     return EOK;
 }
@@ -324,10 +324,10 @@ std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void *), co
     // RH = 1
     msix_table_[msix_vector].vector_control = 0x1;
     msix_table_[msix_vector].message_address_low = 0xFEE00000 |
-        (otrix::arch::local_apic::id() << 12) | (1 << 3);
+        (otrix::arch::local_apic::id() << 12);
     msix_table_[msix_vector].message_address_high = 0;
     // Edge triggered, fixed
-    msix_table_[msix_vector].message_data = irq | (1 << 8);
+    msix_table_[msix_vector].message_data = irq;
     msix_table_[msix_vector].vector_control = 0x0;
 
     return {EOK, msix_vector};
