@@ -23,10 +23,5 @@ SECTIONS {
         PROVIDE_HIDDEN(__init_array_end = .);
     }
 
-    .data :
-    {
-        *(*)
-    }
-
     __binary_end = .;
 }

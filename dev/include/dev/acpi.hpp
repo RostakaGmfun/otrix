@@ -7,7 +7,7 @@
  * Parse ACPI tables into internal storage
  * for further retrieval.
  */
-error_t acpi_init(void);
+kerror_t acpi_init(void);
 
 void *acpi_get_ioapic_addr(void);
 

@@ -3,10 +3,10 @@
 
 typedef enum
 {
-    EOK,
-    ENODEV,
-    ENOMEM,
-    EINVAL,
-} error_t;
+    E_OK,
+    E_NODEV,
+    E_NOMEM,
+    E_INVAL,
+} kerror_t;
 
 #endif // OTRIX_ERROR_H

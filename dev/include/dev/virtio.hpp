@@ -82,16 +82,16 @@ protected:
      *                      and the handler will be called when
      * @parampin] p_handler_context Context for the IRQ handler.
      * @retval ENODEV Available queue size is 0.
-     * @retval EOK Queue created
+     * @retval E_OK Queue created
      */
-    error_t virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *) = nullptr, void *p_handler_context = nullptr);
+    kerror_t virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *) = nullptr, void *p_handler_context = nullptr);
 
-    error_t virtq_destroy(virtq *p_vq);
+    kerror_t virtq_destroy(virtq *p_vq);
 
     /**
      * Add new entry to the descriptor table and put it into the available ring.
      */
-    error_t virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable);
+    kerror_t virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable);
 
     virtual uint32_t negotiate_features(uint32_t device_features);
 

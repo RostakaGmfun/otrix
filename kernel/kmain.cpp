@@ -21,7 +21,7 @@ static uint64_t t2_stack[1024];
 
 using otrix::immediate_console;
 using otrix::kthread;
-using otrix::kthread_scheduler;
+using otrix::scheduler;
 using otrix::arch::local_apic;
 
 static kmem_heap_t root_heap;
@@ -39,7 +39,7 @@ static void init_heap()
                 extern uint64_t __binary_end;
                 void *mem_high_start = &__binary_end;
                 const uint64_t mem_high_size_kb = ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper;
-                immediate_console::print("Low mem size %d kb, Upper mem start 0x016%p, size %dkb %d\n", mem_low_size, mem_high_start, mem_high_size_kb, tag->size);
+                immediate_console::print("Low mem size %d kb, Upper mem start %p, size %dkb\n", mem_low_size, mem_high_start, mem_high_size_kb);
                 // For debugging
                 memset(mem_high_start, 0xa5, mem_high_size_kb);
                 kmem_init(&root_heap, mem_high_start, mem_high_size_kb * 1024);
@@ -94,7 +94,7 @@ extern "C" __attribute__((noreturn)) void kmain(void)
 {
     immediate_console::init();
     // ACPI should be parsed before heap because it is located in usable RAM.
-    if (EOK != acpi_init()) {
+    if (E_OK != acpi_init()) {
         immediate_console::print("Failed to parse ACPI tables\n");
     }
     init_heap();
@@ -131,22 +131,23 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             []() {
                 immediate_console::print("Task1\n");
-                kthread_scheduler::get_current_thread().yield();
+                scheduler::get().schedule();
+                immediate_console::print("after yield 1\n");
                 while (1);
             });
 
     auto thread2 = kthread(t2_stack, sizeof(t2_stack),
             []() {
                 immediate_console::print("Task2\n");
-                kthread_scheduler::get_current_thread().yield();
-                immediate_console::print("after yield\n");
+                scheduler::get().schedule();
                 while (1);
             });
 
-    kthread_scheduler::add_thread(thread1);
-    kthread_scheduler::add_thread(thread2);
+    scheduler::get().add_thread(&thread1);
+    immediate_console::print("Added thread 1\n");
+    scheduler::get().add_thread(&thread2);
+    immediate_console::print("Added thread 2\n");
 
-    otrix::arch::irq_manager::print_irq();
-    kthread_scheduler::schedule();
+    scheduler::get().schedule();
     while (1);
 }

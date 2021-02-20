@@ -42,7 +42,7 @@ void virtio_dev::begin_init()
 
     // MSI-X should be enabled,
     // because we expect to have MSI-X registers in Virtio configuration struct
-    if (EOK != pci_dev_->enable_msix(true)) {
+    if (E_OK != pci_dev_->enable_msix(true)) {
         return;
     }
 
@@ -131,7 +131,7 @@ void virtio_dev::write_reg(uint16_t reg, uint32_t value)
     }
 }
 
-error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *), void *p_handler_context)
+kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *), void *p_handler_context)
 {
     write_reg(queue_select, index);
     const uint16_t queue_len = read_reg(queue_size);
@@ -148,7 +148,7 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_h
 
     virtq *p_vq = (virtq *)otrix::alloc(sizeof(virtq));
     if (nullptr == p_vq) {
-        return ENOMEM;
+        return E_NOMEM;
     }
     memset(p_vq, 0, sizeof(virtq));
 
@@ -160,7 +160,7 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_h
     p_vq->allocated_mem = otrix::alloc(alloc_size);
     if (nullptr == p_vq->allocated_mem) {
         otrix::free(p_vq);
-        return ENOMEM;
+        return E_NOMEM;
     }
     memset(p_vq->allocated_mem, 0, alloc_size);
 
@@ -176,20 +176,20 @@ error_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_h
 
     if (nullptr != p_handler) {
         auto [err, msix_vector] = pci_dev_->request_msix(p_handler, "VQ", p_handler_context);
-        if (EOK == err) {
+        if (E_OK == err) {
             write_reg(queue_msix_vector, msix_vector);
         }
     }
 
     immediate_console::print("Created VQ%d @ %p, msix %04x\n", p_vq->index, p_vq->desc_table, read_reg(queue_msix_vector));
 
-    return EOK;
+    return E_OK;
 }
 
-error_t virtio_dev::virtq_destroy(virtq *p_vq)
+kerror_t virtio_dev::virtq_destroy(virtq *p_vq)
 {
     if (nullptr == p_vq) {
-        return EINVAL;
+        return E_INVAL;
     }
 
     write_reg(queue_select, p_vq->index);
@@ -198,18 +198,18 @@ error_t virtio_dev::virtq_destroy(virtq *p_vq)
     otrix::free(p_vq->allocated_mem);
     otrix::free(p_vq);
 
-    return EOK;
+    return E_OK;
 }
 
-error_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable)
+kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable)
 {
     if (nullptr == p_vq || nullptr == p_buffer || 0 == buffer_size) {
-        return EINVAL;
+        return E_INVAL;
     }
 
     // TODO: Implement free list in the descriptor table
     if (p_vq->num_used_descriptors == p_vq->size) {
-        return ENOMEM;
+        return E_NOMEM;
     }
 
     const int idx = p_vq->num_used_descriptors++;
@@ -230,7 +230,7 @@ error_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buff
         write_reg(queue_notify, p_vq->index);
     }
 
-    return EOK;
+    return E_OK;
 }
 
 uint32_t virtio_dev::negotiate_features(uint32_t device_features)

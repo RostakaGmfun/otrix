@@ -199,10 +199,10 @@ uint8_t pci_dev::get_cap(uint8_t cap_id) const {
 }
 
 
-error_t pci_dev::find_devices(pci_dev::descriptor_t *p_targets, size_t num_targets)
+kerror_t pci_dev::find_devices(pci_dev::descriptor_t *p_targets, size_t num_targets)
 {
     if (nullptr == p_targets || 0 == num_targets) {
-        return EINVAL;
+        return E_INVAL;
     }
 
     for (int bus = 0; bus < PCI_ADDR_MAX_BUSES - 1; bus++) {
@@ -227,7 +227,7 @@ error_t pci_dev::find_devices(pci_dev::descriptor_t *p_targets, size_t num_targe
         }
     }
 
-    return EOK;
+    return E_OK;
 }
 
 uint8_t pci_dev::cfg_read8(uint8_t reg) {
@@ -254,7 +254,7 @@ void pci_dev::cfg_write32(uint8_t reg, uint32_t value) {
     pci_config_write32(bus_, dev_, function_, reg, value);
 }
 
-error_t pci_dev::enable_bus_mastering(bool enable) {
+kerror_t pci_dev::enable_bus_mastering(bool enable) {
     uint32_t command_status = cfg_read32(PCI_REG_STATUS_COMMAND);
     if (enable) {
         command_status |= (1 << 2);
@@ -262,16 +262,16 @@ error_t pci_dev::enable_bus_mastering(bool enable) {
         command_status &= ~(1 << 2);
     }
     cfg_write32(PCI_REG_STATUS_COMMAND, command_status);
-    return EOK;
+    return E_OK;
 }
 
-error_t pci_dev::enable_msix(bool enable) {
+kerror_t pci_dev::enable_msix(bool enable) {
     if (nullptr != msix_table_) {
-        return EOK;
+        return E_OK;
     }
     const uint8_t msix_cap = get_cap(PCI_CAP_ID_MSIX);
     if (0 == msix_cap) {
-        return ENODEV;
+        return E_NODEV;
     }
 
     uint32_t message_control = cfg_read32(msix_cap);
@@ -279,7 +279,7 @@ error_t pci_dev::enable_msix(bool enable) {
         cfg_write32(msix_cap, message_control | (1 << 31));
     } else {
         cfg_write32(msix_cap, message_control & ~(1 << 31));
-        return EOK;
+        return E_OK;
     }
 
     const uint32_t command_status = cfg_read32(PCI_REG_STATUS_COMMAND);
@@ -298,14 +298,14 @@ error_t pci_dev::enable_msix(bool enable) {
     }
     cfg_write32(msix_cap, cfg_read32(msix_cap) & ~(1 << 30)); // Unmask
 
-    return EOK;
+    return E_OK;
 }
 
-std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void *), const char *p_owner, void *p_handler_context) {
+std::pair<kerror_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void *), const char *p_owner, void *p_handler_context) {
     uint16_t msix_vector = 0xFFFF;
 
     if (nullptr == p_handler) {
-        return {EINVAL, msix_vector};
+        return {E_INVAL, msix_vector};
     }
 
     for (uint16_t i = 0; i < msix_table_size_; i++) {
@@ -316,7 +316,7 @@ std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void *), co
     }
 
     if (0xFFFF == msix_vector) {
-        return {ENOMEM, msix_vector};
+        return {E_NOMEM, msix_vector};
     }
 
     const uint8_t irq = otrix::arch::irq_manager::request_irq(p_handler, p_owner, p_handler_context);
@@ -330,7 +330,7 @@ std::pair<error_t, uint16_t> pci_dev::request_msix(void (*p_handler)(void *), co
     msix_table_[msix_vector].message_data = irq;
     msix_table_[msix_vector].vector_control = 0x0;
 
-    return {EOK, msix_vector};
+    return {E_OK, msix_vector};
 }
 
 void pci_dev::free_msix(uint16_t vector) {

@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include "common/assert.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @file intrusive_list.h
  *
@@ -152,5 +156,9 @@ static inline struct intrusive_list *intrusive_list_insert(struct intrusive_list
 
     return node;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // OTRIX_INTRUSIVE_LIST_H

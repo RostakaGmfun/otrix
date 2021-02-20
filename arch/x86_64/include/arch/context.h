@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 #include "common/assert.h"
 
 #ifdef __cplusplus
@@ -24,17 +25,20 @@ struct arch_context
 /**
  * Save current CPU context into @c context.
  */
-extern void arch_context_save(struct arch_context *context);
+void arch_context_save(struct arch_context *context);
 
 /**
  * Restore CPU context from @c context.
  */
-extern void arch_context_restore(const struct arch_context *context);
+void arch_context_restore(const struct arch_context *context);
+
+void arch_context_switch(struct arch_context *prev, struct arch_context *next);
 
 static inline void arch_context_setup(struct arch_context *ctx,
         uint64_t *stack, const size_t stack_size,
         void(*entry)(void))
 {
+    memset(ctx, 0, sizeof(*ctx));
     // Copy current RFLAGS into the context RFLAGS
 	asm volatile("pushfq ; popq %0;" : "=rm" (ctx->rflags) : : "memory");
 

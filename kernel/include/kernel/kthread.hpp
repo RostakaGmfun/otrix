@@ -1,11 +1,15 @@
-#ifndef OTRIX_KTHREAD_HPP
-#define OTRIX_KTHREAD_HPP
+#pragma once
 
 #include <cstddef>
 #include <type_traits>
 
-#include "common/error.hpp"
+#include "common/error.h"
+#include "common/list.h"
 #include "arch/context.h"
+
+#define KTHREAD_PTR(list_ptr) container_of(list_ptr, kthread::node_t, list_node)->p_thread
+
+#define KTHREAD_DEFAULT_PRIORITY 0
 
 namespace otrix
 {
@@ -19,8 +23,7 @@ using kthread_entry = void(*)();
 class kthread
 {
 public:
-    kthread();
-    kthread(uint64_t *stack, size_t stack_size, kthread_entry entry);
+    kthread(uint64_t *stack, size_t stack_size, kthread_entry entry, int priority = KTHREAD_DEFAULT_PRIORITY);
     kthread(const kthread &other) = delete;
     kthread(kthread &&other);
 
@@ -29,64 +32,83 @@ public:
 
     ~kthread();
 
-    uint32_t get_id() const { return id_; }
-
-    void run()
-    {
-        arch_context_restore(&context_);
-    }
+    int get_id() const { return id_; }
 
     /**
      * Suspend the thread allowing other threads to run.
      */
-    error yield();
+    kerror_t yield();
+
+    // standard-layout type to contain the intrusive list node
+    struct node_t
+    {
+        intrusive_list list_node;
+        kthread *p_thread;
+    };
+
+    static_assert(std::is_standard_layout<node_t>::value, "node_t should have standard layout");
+
+    node_t *node()
+    {
+        return &node_;
+    }
+
+    int priority() const {
+        return priority_;
+    }
+
+    arch_context *context() {
+        return &context_;
+    }
 
 private:
     arch_context context_;
-    uint32_t id_;
+    int id_;
     uint64_t *stack_;
     size_t stack_size_;
     kthread_entry entry_;
+    node_t node_;
+    int priority_;
 };
 
-class kthread_scheduler
+class scheduler
 {
 public:
-    kthread_scheduler() = delete;
-    kthread_scheduler(const kthread_scheduler &other) = delete;
-    kthread_scheduler(kthread_scheduler &&other) = delete;
+    scheduler(const scheduler &other) = delete;
+    scheduler(scheduler &&other) = delete;
 
-    kthread_scheduler &operator=(const kthread_scheduler &other) = delete;
-    kthread_scheduler &operator=(kthread_scheduler &&other) = delete;
+    scheduler &operator=(const scheduler &other) = delete;
+    scheduler &operator=(scheduler &&other) = delete;
+
+    static scheduler &get();
 
     /**
      * Add a thread to the scheduling list.
      */
-    static error add_thread(kthread &thread);
+    kerror_t add_thread(kthread *thread);
 
-    static error remove_thread(uint32_t thread_id);
+    kerror_t remove_thread(kthread *thread);
 
-    static kthread *get_thread_by_id(const uint32_t thread_id);
+    kthread *get_thread_by_id(const uint32_t thread_id);
 
     /**
      * Retrieve the currently running thread.
      */
-    static kthread &get_current_thread();
+    kthread *get_current_thread() {
+        return KTHREAD_PTR(current_thread_);
+    }
 
     /**
      * Schedule the next thread to run.
      */
-    static error schedule();
+    kerror_t schedule();
 
 private:
-    // TODO(RostakaGmfun): Add compilation option for array size
-    static constexpr auto thread_queue_size = 16;
-    static kthread *threads_[thread_queue_size];
-    static size_t current_thread_;
-    static kthread idle_thread_;
-    static std::size_t num_threads_;
+    scheduler();
+
+    static constexpr auto NUM_PRIORITIES = 10;
+    intrusive_list *run_queues_[NUM_PRIORITIES];
+    intrusive_list *current_thread_;
 };
 
 } // namespace otrix
-
-#endif // OTRIX_KTHREAD_HPP

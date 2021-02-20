@@ -32,11 +32,11 @@ public:
         return 0;
     }
 
-    error_t enable_bus_mastering(bool enable);
+    kerror_t enable_bus_mastering(bool enable);
 
-    error_t enable_msix(bool enable);
+    kerror_t enable_msix(bool enable);
 
-    std::pair<error_t, uint16_t> request_msix(void (*p_handler)(void *), const char *p_owner, void *p_handler_context = nullptr);
+    std::pair<kerror_t, uint16_t> request_msix(void (*p_handler)(void *), const char *p_owner, void *p_handler_context = nullptr);
 
     void free_msix(uint16_t vector);
 
@@ -52,7 +52,7 @@ public:
     /**
      * Scan PCI buses and initialize requested PCI devices.
      */
-    static error_t find_devices(descriptor_t *p_targets, size_t num_targets);
+    static kerror_t find_devices(descriptor_t *p_targets, size_t num_targets);
 
 private:
     pci_dev(uint8_t bus, uint8_t dev, uint8_t function, uint16_t device_id, uint16_t vendor_id);

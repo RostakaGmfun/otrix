@@ -21,13 +21,13 @@ virtio_console::virtio_console(pci_dev *p_dev): virtio_dev(p_dev)
 {
     begin_init();
 
-    error_t ret = virtq_create(1, &tx_q_, &tx_irq_handler, this);
-    if (EOK != ret) {
+    kerror_t ret = virtq_create(1, &tx_q_, &tx_irq_handler, this);
+    if (E_OK != ret) {
         immediate_console::print("Failed to create TX queue\n");
     }
 
     ret = virtq_create(0, &rx_q_);
-    if (EOK != ret) {
+    if (E_OK != ret) {
         immediate_console::print("Failed to create RX queue\n");
     }
 
