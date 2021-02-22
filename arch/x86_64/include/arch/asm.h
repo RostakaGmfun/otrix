@@ -80,3 +80,10 @@ static inline void arch_write_msr(uint32_t msr, uint64_t val)
     uint32_t hi = val >> 32;
     asm volatile("wrmsr" : : "a"(lo), "d"(hi), "c"(msr));
 }
+
+static inline void arch_cpuid(uint32_t func, uint32_t subfunc, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+{
+    asm volatile ("cpuid"
+      : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
+      : "a"(func), "c"(subfunc));
+}
