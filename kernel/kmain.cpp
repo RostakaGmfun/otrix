@@ -14,7 +14,6 @@
 #include "arch/multiboot2.h"
 #include "kernel/kmem.h"
 #include "arch/kvmclock.hpp"
-#include "arch/pit.hpp"
 #include <cstring>
 #include <cstdio>
 
@@ -108,9 +107,7 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     local_apic::print_regs();
     local_apic::configure_timer(local_apic::timer_mode::oneshot,
             local_apic::timer_divider::divby_32,
-            otrix::arch::irq_manager::request_irq([] (void *) {
-                        immediate_console::print("Ticks: %d\n", otrix::arch::pit::get_ticks());
-                    }, "APIC timer"));
+            otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
     if (!otrix::arch::kvmclock::init()) {
         immediate_console::print("Failed to initialize KVMclock\n");
     }
@@ -118,7 +115,6 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     otrix::arch::irq_manager::print_irq();
     arch_enable_interrupts();
     local_apic::start_timer(1);
-    otrix::arch::pit::start(1194);
 
     otrix::dev::pci_dev::find_devices(pci_dev_list, sizeof(pci_dev_list) / sizeof(pci_dev_list[0]));
 
