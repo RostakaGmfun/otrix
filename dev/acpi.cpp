@@ -68,8 +68,9 @@ enum acpi_madt_entry_type
 {
     ACPI_MADT_LAPIC = 0,
     ACPI_MADT_IOAPIC = 1,
-    ACPI_MADT_LAPIC_OVERRIDE = 2,
+    ACPI_MADT_IRQ_SOURCE_OVERRIDE = 2,
     ACPI_MADR_NMI = 4,
+    ACPI_MADT_LAPIC_OVERRIDE = 5,
 };
 
 struct acpi_madt_entry_hdr
@@ -122,22 +123,22 @@ static void acpi_madt_parse_ioapic(const struct acpi_madt_ioapic *ioapic)
 {
     acpi_context.ioapic_base = (void *)((uint64_t)ioapic->ioapic_base);
     acpi_context.ioapic_id = ioapic->ioapic_id;
-    immediate_console::print("IOAPIC base %p, id\n", acpi_context.ioapic_base, acpi_context.ioapic_id);
+    immediate_console::print("IOAPIC base %p, id %d\n", acpi_context.ioapic_base, acpi_context.ioapic_id);
 }
 
 static kerror_t acpi_parse_madt(const struct acpi_madt *madt)
 {
     immediate_console::print("Parsing MADT @ %p\n", madt);
-    int num_entries = (madt->hdr.length - sizeof(struct acpi_madt))/8;
     const uint8_t *entry = madt->entries;
+    uint32_t len = madt->hdr.length - sizeof(acpi_madt);
 
     acpi_context.lapic_base = (void *)(uintptr_t)madt->local_apic_address;
     immediate_console::print("LAPIC base %p\n", acpi_context.lapic_base);
 
-    while (num_entries > 0) {
+    while (len > 0) {
         const acpi_madt_entry_hdr *hdr = reinterpret_cast<const acpi_madt_entry_hdr *>(entry);
-        entry += madt->hdr.length;
-        num_entries--;
+        entry += hdr->length;
+        len -= hdr->length;
         switch (hdr->type) {
         case ACPI_MADT_LAPIC_OVERRIDE:
             acpi_context.lapic_base = (void *)((struct acpi_madt_lapic_override *)hdr)->lapic_address;
