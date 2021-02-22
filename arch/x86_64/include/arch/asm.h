@@ -87,3 +87,10 @@ static inline void arch_cpuid(uint32_t func, uint32_t subfunc, uint32_t *eax, ui
       : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
       : "a"(func), "c"(subfunc));
 }
+
+static inline uint64_t arch_tsc(void)
+{
+    uint32_t hi, lo;
+    asm volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t) lo) | ((uint64_t) hi) << 32;
+}
