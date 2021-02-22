@@ -62,6 +62,30 @@ uint64_t boottime_ns()
     return sec * 1000 + nsec / 1000000;
 }
 
+uint64_t ns_to_tsc(uint64_t ns)
+{
+    uint32_t version;
+    uint64_t tsc_to_system_mul;
+    signed char tsc_shift;
+    do {
+        version = time_info.version;
+        asm("lfence" ::: "memory");
+        tsc_to_system_mul = time_info.tsc_to_system_mul;
+        tsc_shift = time_info.tsc_shift;
+        asm("lfence" ::: "memory");
+    } while ((time_info.version & 1) || (time_info.version != version));
+
+    ns <<= 32;
+    ns /= tsc_to_system_mul;
+
+    if (tsc_shift < 0) {
+        ns <<= -tsc_shift;
+    } else {
+        ns >>= tsc_shift;
+    }
+    return ns;
+}
+
 uint64_t systime_ns()
 {
     uint32_t version;

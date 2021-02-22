@@ -105,32 +105,29 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     otrix::arch::irq_manager::init();
     local_apic::init(acpi_get_lapic_addr());
     local_apic::print_regs();
-    local_apic::configure_timer(local_apic::timer_mode::oneshot,
-            local_apic::timer_divider::divby_32,
-            otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
+    local_apic::init_timer(otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
     if (!otrix::arch::kvmclock::init()) {
         immediate_console::print("Failed to initialize KVMclock\n");
     }
     immediate_console::print("Systime: %lu\n", otrix::arch::kvmclock::systime_ms());
     otrix::arch::irq_manager::print_irq();
     arch_enable_interrupts();
-    local_apic::start_timer(1);
+    local_apic::start_timer(1000 * 1000);
 
     otrix::dev::pci_dev::find_devices(pci_dev_list, sizeof(pci_dev_list) / sizeof(pci_dev_list[0]));
 
     if (nullptr != pci_dev_list[PCI_DEVICE_VIRTIO_NET].p_dev) {
         otrix::dev::pci_dev *p_dev = pci_dev_list[PCI_DEVICE_VIRTIO_NET].p_dev;
         otrix::dev::virtio_net virtio_net(p_dev);
-        //p_dev->print_info();
-        //virtio_net.print_info();
+        p_dev->print_info();
+        virtio_net.print_info();
     }
 
     if (nullptr != pci_dev_list[PCI_DEVICE_VIRTIO_CONSOLE].p_dev) {
         otrix::dev::pci_dev *p_dev = pci_dev_list[PCI_DEVICE_VIRTIO_CONSOLE].p_dev;
         otrix::dev::virtio_console virtio_console(p_dev);
-        //virtio_console.print_info();
-        //p_dev->print_info();
-        //otrix::arch::irq_manager::print_irq();
+        virtio_console.print_info();
+        p_dev->print_info();
     }
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),

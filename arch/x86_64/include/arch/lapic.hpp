@@ -12,19 +12,6 @@ class local_apic
 {
 public:
 
-    enum class timer_mode
-    {
-        oneshot,
-        periodic,
-    };
-
-    enum class timer_divider
-    {
-        divby_2 = 0x00,
-        divby_4 = 0x01,
-        divby_32 = 0x8,
-    };
-
     local_apic() = delete;
 
     //! Sets the base address for LAPIC
@@ -40,19 +27,14 @@ public:
 
     //! Configure the LAPIC timer.
     //!
-    //! \param[in] mode Mode (one-shot/periodic).
-    //! \param[in] divider Frequency divider
-    //!                    of the bus clock used as a source.
     //! \param[in] isr_vector_number IRQ number which is used
     //!                              to service timer interrupts.
-    static void configure_timer(const enum timer_mode mode,
-            const timer_divider divider,
-            const uint8_t isr_vector_number);
+    static void init_timer(uint8_t isr_vector_number);
 
     //! Start previously configured timer.
     //!
-    //! \param[in] num_cnt Number of counts to tick.
-    static void start_timer(const int32_t num_cnt);
+    //! \param[in] timeout_us Timeout in microseconds.
+    static void start_timer(uint64_t timeout_us);
 
     static void stop_timer();
 
