@@ -7,15 +7,25 @@
 #include "common/list.h"
 #include "arch/context.h"
 
-#define KTHREAD_PTR(list_ptr) container_of(list_ptr, kthread::node_t, list_node)->p_thread
+#define KTHREAD_NODE_PTR(list_ptr) container_of(list_ptr, kthread::node_t, list_node)
+#define KTHREAD_PTR(list_ptr) KTHREAD_NODE_PTR(list_ptr)->p_thread
 
 #define KTHREAD_DEFAULT_PRIORITY 0
+
+#define KTHREAD_BLOCK_INF (-1)
 
 namespace otrix
 {
 
 // TODO(RostakaGmfun): Add more type safety
 using kthread_entry = void(*)();
+
+enum kthread_state {
+    KTHREAD_STATE_ZOMBIE,  /**< Not present int any of the thread queues **/
+    KTHREAD_STATE_ACTIVE,  /**< Current thread **/
+    KTHREAD_STATE_RUNNABLE,/**< In the runnable queue **/
+    KTHREAD_STATE_BLOCKED, /**< Blocked **/
+};
 
 /**
  * Represents a single-core kernel cooperating threads (fibers).
@@ -34,16 +44,15 @@ public:
 
     int get_id() const { return id_; }
 
-    /**
-     * Suspend the thread allowing other threads to run.
-     */
-    kerror_t yield();
-
     // standard-layout type to contain the intrusive list node
     struct node_t
     {
         intrusive_list list_node;
         kthread *p_thread;
+        uint64_t tsc_deadline;
+        void (*unblock_handler)(void *ctx);
+        void *unblock_handler_ctx;
+        kthread_state state;
     };
 
     static_assert(std::is_standard_layout<node_t>::value, "node_t should have standard layout");
@@ -82,6 +91,8 @@ public:
 
     static scheduler &get();
 
+    static void timer_irq_handler(void *p_ctx);
+
     /**
      * Add a thread to the scheduling list.
      */
@@ -89,7 +100,15 @@ public:
 
     kerror_t remove_thread(kthread *thread);
 
-    kthread *get_thread_by_id(const uint32_t thread_id);
+    /**
+     * Move thread to blocked queue (inifinte or with timeout).
+     */
+    kerror_t block_thread(kthread *thread, uint64_t block_time_ms, void (*handler)(void *), void *p_ctx);
+
+    /**
+     * Move thread from blocked queue to run queue.
+     */
+    kerror_t unblock_thread(kthread *thread);
 
     /**
      * Retrieve the currently running thread.
@@ -106,9 +125,14 @@ public:
 private:
     scheduler();
 
+    void handle_timer_irq();
+
     static constexpr auto NUM_PRIORITIES = 10;
-    intrusive_list *run_queues_[NUM_PRIORITIES];
+    intrusive_list *runnable_queues_[NUM_PRIORITIES];
+    intrusive_list *blocked_queues_[NUM_PRIORITIES];
     intrusive_list *current_thread_;
+    bool need_resched_;
+    uint64_t nearest_tsc_deadline_;
 };
 
 } // namespace otrix

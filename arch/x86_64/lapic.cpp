@@ -1,7 +1,6 @@
 #include "arch/lapic.hpp"
 #include "otrix/immediate_console.hpp"
 #include "arch/asm.h"
-#include "arch/kvmclock.hpp"
 
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MSR_ENABLE 0x800
@@ -75,9 +74,9 @@ void local_apic::init_timer(const uint8_t isr_vector_number)
     write32(lapic_timer_lvt, (2 << 17) | isr_vector_number);
 }
 
-void local_apic::start_timer(uint64_t timeout_us)
+void local_apic::start_timer(uint64_t tsc_deadline)
 {
-    arch_write_msr(IA32_MSR_TSC_DEADLINE, arch_tsc() + kvmclock::ns_to_tsc(timeout_us * 1000));
+    arch_write_msr(IA32_MSR_TSC_DEADLINE, tsc_deadline);
 }
 
 void local_apic::stop_timer()

@@ -13,6 +13,7 @@
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
 #include "kernel/kmem.h"
+#include "kernel/waitq.hpp"
 #include "arch/kvmclock.hpp"
 #include <cstring>
 #include <cstdio>
@@ -130,20 +131,22 @@ extern "C" __attribute__((noreturn)) void kmain(void)
         p_dev->print_info();
     }
 
+    static otrix::waitq sync;
+
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             []() {
                 immediate_console::print("Task1\n");
-                scheduler::get().schedule();
-                immediate_console::print("after yield 1\n");
+                sync.notify_one();
                 while (1);
-            });
+            }, 1);
 
     auto thread2 = kthread(t2_stack, sizeof(t2_stack),
             []() {
                 immediate_console::print("Task2\n");
-                scheduler::get().schedule();
+                sync.wait();
+                immediate_console::print("Task2 after wait\n");
                 while (1);
-            });
+            }, 1);
 
     scheduler::get().add_thread(&thread1);
     immediate_console::print("Added thread 1\n");
