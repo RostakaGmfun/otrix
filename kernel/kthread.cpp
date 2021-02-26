@@ -130,14 +130,12 @@ kerror_t scheduler::schedule()
     return E_OK;
 }
 
-kerror_t scheduler::block_thread(kthread *thread, uint64_t block_time_ms, void (*handler)(void *), void *p_ctx)
+kerror_t scheduler::block_thread(kthread *thread, uint64_t block_time_ms)
 {
     auto flags = arch_irq_save();
 
     remove_thread(thread);
     intrusive_list *prev_thread = nullptr;
-    thread->node()->unblock_handler = handler;
-    thread->node()->unblock_handler_ctx = p_ctx;
     thread->node()->state = KTHREAD_STATE_BLOCKED;
     if (static_cast<uint64_t>(-1) == block_time_ms) {
         thread->node()->tsc_deadline = -1;
@@ -175,7 +173,7 @@ kerror_t scheduler::block_thread(kthread *thread, uint64_t block_time_ms, void (
     return E_OK;
 }
 
-kerror_t scheduler::unblock_thread(kthread *thread, bool invoke_unblock_handler)
+kerror_t scheduler::unblock_thread(kthread *thread)
 {
     auto flags = arch_irq_save();
 
@@ -187,10 +185,6 @@ kerror_t scheduler::unblock_thread(kthread *thread, bool invoke_unblock_handler)
     blocked_queues_[thread->priority()] = intrusive_list_delete(blocked_queues_[thread->priority()], &thread->node()->list_node);
 
     add_thread(thread);
-
-    if (nullptr != thread->node()->unblock_handler && invoke_unblock_handler) {
-        thread->node()->unblock_handler(thread->node()->unblock_handler_ctx);
-    }
 
     arch_irq_restore(flags);
 
@@ -204,7 +198,7 @@ void scheduler::handle_timer_irq()
             intrusive_list *t = blocked_queues_[p];
             while (KTHREAD_NODE_PTR(t)->tsc_deadline < arch_tsc()) {
                 auto next = t->next;
-                unblock_thread(KTHREAD_PTR(t), true);
+                unblock_thread(KTHREAD_PTR(t));
                 if (next == t) {
                     break;
                 }

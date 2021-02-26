@@ -20,15 +20,12 @@ public:
 
 private:
 
-    static void unblock_handler(void *ctx);
-
     // Context for blocked thread
     struct waitq_item
     {
         intrusive_list list_node;
         bool wakeup_successful;
         kthread *thread;
-        waitq *self;
     };
 
     intrusive_list *wq_;

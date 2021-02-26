@@ -50,8 +50,6 @@ public:
         intrusive_list list_node;
         kthread *p_thread;
         uint64_t tsc_deadline;
-        void (*unblock_handler)(void *ctx);
-        void *unblock_handler_ctx;
         kthread_state state;
     };
 
@@ -103,12 +101,12 @@ public:
     /**
      * Move thread to blocked queue (inifinte or with timeout).
      */
-    kerror_t block_thread(kthread *thread, uint64_t block_time_ms, void (*handler)(void *), void *p_ctx);
+    kerror_t block_thread(kthread *thread, uint64_t block_time_ms);
 
     /**
      * Move thread from blocked queue to run queue.
      */
-    kerror_t unblock_thread(kthread *thread, bool invoke_unblock_handler = false);
+    kerror_t unblock_thread(kthread *thread);
 
     /**
      * Retrieve the currently running thread.
