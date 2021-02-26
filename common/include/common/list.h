@@ -58,6 +58,11 @@ static inline struct intrusive_list *intrusive_list_push_back(struct intrusive_l
 {
     kASSERT(head != NULL && tail != NULL);
 
+    if (NULL == head) {
+        intrusive_list_init(tail);
+        return tail;
+    }
+
     struct intrusive_list *last = intrusive_list_get_tail(head);
 
     last->next = tail;
@@ -105,6 +110,25 @@ static inline struct intrusive_list *intrusive_list_find_first(struct intrusive_
     } while ((current = current->next));
 
     return NULL;
+}
+
+/**
+ * Deletes entry from list.
+ *
+ * @retval New head of list.
+ */
+static inline struct intrusive_list *intrusive_list_delete(struct intrusive_list *head, struct intrusive_list *node)
+{
+    if (node == head) {
+        // List is made of a single item to be deleted
+        if (node == node->next) {
+            return NULL;
+        }
+        head = node->next;
+    }
+
+    intrusive_list_unlink_node(node);
+    return head;
 }
 
 /**

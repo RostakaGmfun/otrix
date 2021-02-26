@@ -20,13 +20,12 @@ void waitq::wait()
 {
     kthread *thread = scheduler::get().get_current_thread();
     auto flags = arch_irq_save();
-    scheduler::get().remove_thread(thread);
-    if (nullptr == wq_) {
-        intrusive_list_init(&thread->node()->list_node);
-        wq_ = &thread->node()->list_node;
-    } else {
-        intrusive_list_push_back(wq_, &thread->node()->list_node);
-    }
+    waitq_item ctx;
+    intrusive_list_init(&ctx.wq_node);
+    ctx.ret = 0;
+    ctx.thread = thread;
+    scheduler::get().block_thread(thread, -1, unblock_handler, &ctx);
+    wq_ = intrusive_list_push_back(wq_, &ctx.wq_node);
     arch_irq_restore(flags);
 
     scheduler::get().schedule();
@@ -40,14 +39,11 @@ void waitq::notify_one()
         return arch_irq_restore(flags);
     }
 
-    thread = KTHREAD_PTR(wq_);
-    if (wq_->next == wq_) {
-        wq_ = nullptr;
-    } else {
-        wq_ = wq_->next;
-    }
+    waitq_item *node = container_of(node, waitq_item, wq_node);
+    thread = node->thread;
+    wq_ = intrusive_list_delete(wq_, &ctx->wq_node);
+    scheduler::get().unblock_thread(thread);
     arch_irq_restore(flags);
-    scheduler::get().add_thread(thread);
 }
 
 void waitq::notify_all()

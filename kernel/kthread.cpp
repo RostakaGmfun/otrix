@@ -74,12 +74,7 @@ kerror_t scheduler::add_thread(kthread *thread)
     const int prio = thread->priority();
     const auto flags = arch_irq_save();
     thread->node()->state = KTHREAD_STATE_RUNNABLE;
-    if (nullptr == runnable_queues_[prio]) {
-        intrusive_list_init(&thread->node()->list_node);
-        runnable_queues_[prio] = &thread->node()->list_node;
-    } else {
-        intrusive_list_push_back(runnable_queues_[prio], &thread->node()->list_node);
-    }
+    runnable_queues_[prio] = intrusive_list_push_back(runnable_queues_[prio], &thread->node()->list_node);
     if (nullptr != current_thread_ && KTHREAD_PTR(current_thread_)->priority() < prio) {
         need_resched_ = true;
     }
@@ -96,12 +91,7 @@ kerror_t scheduler::remove_thread(kthread *thread)
 
     const int prio = thread->priority();
     thread->node()->state = KTHREAD_STATE_ZOMBIE;
-    if (thread->node()->list_node.next == &thread->node()->list_node) {
-        runnable_queues_[prio] = nullptr;
-    } else {
-        intrusive_list_unlink_node(&thread->node()->list_node);
-    }
-
+    runnable_queues_[prio] = intrusive_list_delete(runnable_queues_[prio], &thread->node()->list_node);
     arch_irq_restore(flags);
     return E_OK;
 }
@@ -194,11 +184,7 @@ kerror_t scheduler::unblock_thread(kthread *thread)
         return E_INVAL;
     }
 
-    if (thread->node()->list_node.next == &thread->node()->list_node) {
-        blocked_queues_[thread->priority()] = nullptr;
-    } else {
-        intrusive_list_unlink_node(&thread->node()->list_node);
-    }
+    blocked_queues_[thread->priority()] = intrusive_list_delete(blocked_queues_[thread->priority()], &thread->node()->list_node);
 
     add_thread(thread);
 
