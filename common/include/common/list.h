@@ -56,7 +56,7 @@ static inline struct intrusive_list *intrusive_list_get_tail(struct intrusive_li
 static inline struct intrusive_list *intrusive_list_push_back(struct intrusive_list *head,
         struct intrusive_list *tail)
 {
-    kASSERT(head != NULL && tail != NULL);
+    kASSERT(tail != NULL);
 
     if (NULL == head) {
         intrusive_list_init(tail);

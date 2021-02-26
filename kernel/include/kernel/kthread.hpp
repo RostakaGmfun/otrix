@@ -108,7 +108,7 @@ public:
     /**
      * Move thread from blocked queue to run queue.
      */
-    kerror_t unblock_thread(kthread *thread);
+    kerror_t unblock_thread(kthread *thread, bool invoke_unblock_handler = false);
 
     /**
      * Retrieve the currently running thread.

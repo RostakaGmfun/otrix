@@ -137,14 +137,13 @@ extern "C" __attribute__((noreturn)) void kmain(void)
             []() {
                 immediate_console::print("Task1\n");
                 sync.notify_one();
-                while (1);
             }, 1);
 
     auto thread2 = kthread(t2_stack, sizeof(t2_stack),
             []() {
                 immediate_console::print("Task2\n");
-                sync.wait();
-                immediate_console::print("Task2 after wait\n");
+                const bool ret = sync.wait();
+                immediate_console::print("Task2 after wait, ret=%d\n", ret);
                 while (1);
             }, 1);
 
