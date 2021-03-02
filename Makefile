@@ -9,8 +9,7 @@ all: build
 	@mkdir -p build/iso
 	@cp build/kernel/otrix_kernel build/isofiles/boot/
 	@cp arch/x86_64/grub.cfg build/isofiles/boot/grub/
-	@grub-mkrescue -o otrix.iso build/isofiles
-	@cp otrix.iso build/iso
+	@grub-mkrescue -o build/otrix.iso build/isofiles
 
 test: tests_build
 	@make -sC tests_build

@@ -3,3 +3,4 @@ tests_build/
 result
 *.bin
 *.iso
+*.pcap
