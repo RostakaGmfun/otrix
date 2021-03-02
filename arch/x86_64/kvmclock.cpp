@@ -1,6 +1,7 @@
 #include "arch/kvmclock.hpp"
 #include "arch/asm.h"
 #include <cstring>
+#include "otrix/immediate_console.hpp"
 
 #define KVM_CPUID_SIGNATURE 0x40000000
 #define KVM_FEATURE_CLOCKSOURCE2 3
@@ -75,8 +76,9 @@ uint64_t ns_to_tsc(uint64_t ns)
         asm("lfence" ::: "memory");
     } while ((time_info.version & 1) || (time_info.version != version));
 
-    ns <<= 32;
-    ns /= tsc_to_system_mul;
+    uint64_t tmp = 0;
+    asm volatile("shld $32, %%rax, %%rdx; shl $32, %%rax; divq %[mul_fraq]"
+            : "=a"(ns): "a"(ns), "d"(tmp), [mul_fraq]"rm"(tsc_to_system_mul));
 
     if (tsc_shift < 0) {
         ns <<= -tsc_shift;

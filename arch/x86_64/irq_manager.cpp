@@ -102,14 +102,14 @@ void irq_manager::irq_handler()
 {
     const int irq_n = local_apic::get_active_irq();
 
+    local_apic::signal_eoi();
+
     if (irq_n >= 0 && irq_table[irq_n].allocated) {
         irq_table[irq_n].counter++;
         if (irq_table[irq_n].handler) {
             irq_table[irq_n].handler(irq_table[irq_n].p_context);
         }
     }
-
-    local_apic::signal_eoi();
 }
 
 } // namespace otrix::arch

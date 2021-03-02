@@ -181,6 +181,48 @@ static inline struct intrusive_list *intrusive_list_insert(struct intrusive_list
     return node;
 }
 
+/**
+ * Inserts node after prev.
+ *
+ * @param[in] prev  List node to insert after.
+ * @param[in] node  List node to insert.
+ *
+ * @return Pointer to inserted node.
+ */
+static inline struct intrusive_list *intrusive_list_insert_sorted(struct intrusive_list *head,
+        struct intrusive_list *node, bool (*compare)(struct intrusive_list *a, struct intrusive_list *b))
+{
+    kASSERT(node != NULL);
+
+    if (NULL == head) {
+        return node;
+    }
+
+    // Replace head
+    if (compare(head, node)) {
+        node->next = head;
+        node->prev = head->prev;
+        head->prev = node;
+        if (head->next == head) {
+            head->next = node;
+        }
+        return node;
+    }
+
+    struct intrusive_list *current = head->next;
+    while(current != head && !compare(current, node)) {
+        current = current->next;
+    }
+    node->next = current;
+    node->prev = current->prev;
+    current->prev = node;
+    if (current->next == current) {
+        current->next = node;
+    }
+
+    return head;
+}
+
 #ifdef __cplusplus
 }
 #endif

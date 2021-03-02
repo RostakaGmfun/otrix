@@ -106,14 +106,13 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     otrix::arch::irq_manager::init();
     local_apic::init(acpi_get_lapic_addr());
     local_apic::print_regs();
-    local_apic::init_timer(otrix::arch::irq_manager::request_irq(nullptr, "APIC timer"));
+    local_apic::init_timer(otrix::arch::irq_manager::request_irq(otrix::scheduler::handle_timer_irq, "APIC timer"));
     if (!otrix::arch::kvmclock::init()) {
         immediate_console::print("Failed to initialize KVMclock\n");
     }
     immediate_console::print("Systime: %lu\n", otrix::arch::kvmclock::systime_ms());
     otrix::arch::irq_manager::print_irq();
     arch_enable_interrupts();
-    local_apic::start_timer(1000 * 1000);
 
     otrix::dev::pci_dev::find_devices(pci_dev_list, sizeof(pci_dev_list) / sizeof(pci_dev_list[0]));
 
@@ -135,17 +134,20 @@ extern "C" __attribute__((noreturn)) void kmain(void)
 
     auto thread1 = kthread(t1_stack, sizeof(t1_stack),
             []() {
-                immediate_console::print("Task1\n");
-                sync.notify_one();
-            }, 1);
+                while (1) {
+                    immediate_console::print("Task1\n");
+                    immediate_console::print("Task1 after wait, ret = %d\n", sync.wait(1000));
+                }
+            }, "Task1", 1);
 
     auto thread2 = kthread(t2_stack, sizeof(t2_stack),
             []() {
-                immediate_console::print("Task2\n");
-                const bool ret = sync.wait();
-                immediate_console::print("Task2 after wait, ret=%d\n", ret);
-                while (1);
-            }, 1);
+                while (1) {
+                    immediate_console::print("Task2\n");
+                    scheduler::get().sleep(5000);
+                    sync.notify_one();
+                }
+            }, "Task2", 1);
 
     scheduler::get().add_thread(&thread1);
     immediate_console::print("Added thread 1\n");
@@ -153,6 +155,7 @@ extern "C" __attribute__((noreturn)) void kmain(void)
     immediate_console::print("Added thread 2\n");
 
     immediate_console::print("Systime: %lu\n", otrix::arch::kvmclock::systime_ms());
-    scheduler::get().schedule();
-    while (1);
+    while (1) {
+        scheduler::get().schedule();
+    }
 }

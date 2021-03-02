@@ -47,8 +47,8 @@ TEST(list_tests, test_list_delete_first)
 {
     test_data_t test_data[10];
     memset(test_data, 0, sizeof(test_data));
-    struct intrusive_list *head = &(test_data[0].node);
-    for (int i = 0; i < sizeof(test_data)/sizeof(test_data_t); i++) {
+    struct intrusive_list *head = &test_data[0].node;
+    for (size_t i = 0; i < sizeof(test_data) / sizeof(test_data_t); i++) {
         intrusive_list_init(&test_data[i].node);
         if (&test_data[i].node != head) {
             intrusive_list_push_back(head, &(test_data[i].node));

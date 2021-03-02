@@ -25,10 +25,9 @@ bool waitq::wait(uint64_t timeout_ms)
     ctx.wakeup_successful = false;
     ctx.thread = thread;
     wq_ = intrusive_list_push_back(wq_, &ctx.list_node);
-    scheduler::get().block_thread(thread, timeout_ms);
+    scheduler::get().sleep(timeout_ms);
     arch_irq_restore(flags);
 
-    scheduler::get().schedule();
     return ctx.wakeup_successful;
 }
 
@@ -37,14 +36,15 @@ void waitq::notify_one()
     kthread *thread = nullptr;
     auto flags = arch_irq_save();
     if (nullptr == wq_) {
-        return arch_irq_restore(flags);
+        arch_irq_restore(flags);
+        return;
     }
 
     waitq_item *ctx = container_of(wq_, waitq_item, list_node);
     thread = ctx->thread;
     wq_ = intrusive_list_delete(wq_, &ctx->list_node);
     ctx->wakeup_successful = true;
-    scheduler::get().unblock_thread(thread);
+    scheduler::get().wake(thread);
     arch_irq_restore(flags);
     scheduler::get().schedule();
 }

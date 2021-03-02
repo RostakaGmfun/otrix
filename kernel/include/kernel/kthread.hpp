@@ -33,20 +33,23 @@ enum kthread_state {
 class kthread
 {
 public:
-    kthread(uint64_t *stack, size_t stack_size, kthread_entry entry, int priority = KTHREAD_DEFAULT_PRIORITY);
+    kthread(uint64_t *stack, size_t stack_size, kthread_entry entry, const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
+    kthread(const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
     kthread(const kthread &other) = delete;
-    kthread(kthread &&other);
+    kthread(kthread &&other) = delete;
 
     kthread &operator=(const kthread &other) = delete;
-    kthread &operator=(kthread &&other);
+    kthread &operator=(kthread &&other) = delete;
 
     ~kthread();
-
-    int get_id() const { return id_; }
 
     // standard-layout type to contain the intrusive list node
     struct node_t
     {
+        node_t(kthread *thread): p_thread(thread), tsc_deadline(0), state(KTHREAD_STATE_ZOMBIE)
+        {
+            intrusive_list_init(&list_node);
+        }
         intrusive_list list_node;
         kthread *p_thread;
         uint64_t tsc_deadline;
@@ -68,14 +71,18 @@ public:
         return &context_;
     }
 
+    const char *name() const {
+        return name_;
+    }
+
 private:
     arch_context context_;
-    int id_;
     uint64_t *stack_;
     size_t stack_size_;
     kthread_entry entry_;
     node_t node_;
     int priority_;
+    const char *name_;
 };
 
 class scheduler
@@ -89,7 +96,7 @@ public:
 
     static scheduler &get();
 
-    static void timer_irq_handler(void *p_ctx);
+    static void handle_timer_irq(void *p_ctx);
 
     /**
      * Add a thread to the scheduling list.
@@ -99,14 +106,14 @@ public:
     kerror_t remove_thread(kthread *thread);
 
     /**
-     * Move thread to blocked queue (inifinte or with timeout).
+     * Move current thread to blocked queue (inifinte or with timeout).
      */
-    kerror_t block_thread(kthread *thread, uint64_t block_time_ms);
+    kerror_t sleep(uint64_t sleep_time_ms);
 
     /**
      * Move thread from blocked queue to run queue.
      */
-    kerror_t unblock_thread(kthread *thread);
+    kerror_t wake(kthread *thread);
 
     /**
      * Retrieve the currently running thread.
@@ -123,6 +130,8 @@ public:
 private:
     scheduler();
 
+    void setup_timer();
+
     void handle_timer_irq();
 
     static constexpr auto NUM_PRIORITIES = 10;
@@ -131,6 +140,8 @@ private:
     intrusive_list *current_thread_;
     bool need_resched_;
     uint64_t nearest_tsc_deadline_;
+
+    kthread idle_thread_;
 };
 
 } // namespace otrix

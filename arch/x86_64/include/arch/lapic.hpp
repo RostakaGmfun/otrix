@@ -34,7 +34,7 @@ public:
     //! Start previously configured timer.
     //!
     //! \param[in] timeout_us Timeout in microseconds.
-    static void start_timer(uint64_t timeout_us);
+    static void start_timer(uint64_t tsc_deadline);
 
     static void stop_timer();
 
