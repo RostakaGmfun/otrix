@@ -7,6 +7,7 @@ typedef enum
     E_NODEV,
     E_NOMEM,
     E_INVAL,
+    E_TOUT,
 } kerror_t;
 
 #endif // OTRIX_ERROR_H

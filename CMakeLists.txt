@@ -17,6 +17,7 @@ if(BUILD_HOST_TESTS)
 else()
   add_subdirectory(arch/${TARGET_ARCH})
   add_subdirectory(dev)
+  add_subdirectory(net)
 endif()
 
 add_subdirectory(common)

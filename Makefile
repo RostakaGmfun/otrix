@@ -2,22 +2,22 @@ TOOLCHAIN_PATH   ?= /data/x86_64-unknown-elf
 TOOLCHAIN_PREFIX ?= x86_64-unknown-elf-
 
 all: build
-	@make -sC build
+	@$(MAKE) -sC build
 	@echo "Verifying if binary conforms GRUB Multiboot2"
-	@grub-file --is-x86-multiboot2 build/kernel/otrix_kernel
+	@grub-file --is-x86-multiboot2 build/kernel/otrix
 	@mkdir -p build/isofiles/boot/grub
 	@mkdir -p build/iso
-	@cp build/kernel/otrix_kernel build/isofiles/boot/
+	@cp build/kernel/otrix build/isofiles/boot/
 	@cp arch/x86_64/grub.cfg build/isofiles/boot/grub/
 	@grub-mkrescue -o build/otrix.iso build/isofiles
 
 test: tests_build
-	@make -sC tests_build
-	@make -sC tests_build test
+	@$(MAKE) -sC tests_build
+	@$(MAKE) -sC tests_build test
 
 .PHONY: clean
 clean:
-	@make -sC build clean
+	@$(MAKE) -sC build clean
 
 tests_build:
 	@if [ ! -e "tests_build/Makefile" ]; then \

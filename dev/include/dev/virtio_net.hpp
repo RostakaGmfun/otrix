@@ -1,11 +1,14 @@
 #pragma once
 
 #include "dev/virtio.hpp"
+#include "net/linkif.hpp"
+#include "common/utils.h"
+#include "kernel/semaphore.hpp"
 
 namespace otrix::dev
 {
 
-class virtio_net final: public virtio_dev
+class virtio_net final: public virtio_dev, public net::linkif
 {
 public:
     virtio_net(pci_dev *p_dev);
@@ -21,7 +24,10 @@ public:
         return p_dev->vendor_id() == 0x1af4 && p_dev->device_id() == 0x1000;
     }
 
-    void get_mac(uint8_t (&mac)[6]);
+    void get_mac(net::mac_t *p_out) override;
+
+    kerror_t write(const void *data, size_t size, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms) override;
+    size_t read(void *data, size_t size, net::mac_t *src, net::ethertype *type, uint64_t timeout_ms) override;
 
 protected:
     uint32_t negotiate_features(uint32_t device_features) override;
@@ -41,8 +47,16 @@ protected:
     void write_reg(uint16_t reg, uint32_t value) override;
 
 private:
+
+    static void tx_completion_event(void *ctx);
+
     virtq *tx_q_;
     virtq *rx_q_;
+
+    semaphore tx_complete_;
+    uint8_t *tx_buffer_;
+
+    static constexpr auto MTU = 1500;
 };
 
 } // namespace otrix::dev

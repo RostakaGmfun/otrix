@@ -12,7 +12,7 @@
 
 #define KTHREAD_DEFAULT_PRIORITY 0
 
-#define KTHREAD_BLOCK_INF (-1)
+#define KTHREAD_TIMEOUT_INF (-1)
 
 namespace otrix
 {
@@ -33,7 +33,7 @@ enum kthread_state {
 class kthread
 {
 public:
-    kthread(uint64_t *stack, size_t stack_size, kthread_entry entry, const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
+    kthread(size_t stack_size, kthread_entry entry, const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
     kthread(const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
     kthread(const kthread &other) = delete;
     kthread(kthread &&other) = delete;

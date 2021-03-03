@@ -1,5 +1,7 @@
 #include "kernel/kthread.hpp"
+
 #include <algorithm>
+#include "kernel/alloc.hpp"
 #include "arch/asm.h"
 #include "arch/kvmclock.hpp"
 #include "arch/lapic.hpp"
@@ -7,9 +9,10 @@
 namespace otrix
 {
 
-kthread::kthread(uint64_t *stack, size_t stack_size, kthread_entry entry, const char *name, int priority):
-    stack_(stack), stack_size_(stack_size), entry_(entry), node_(this), priority_(priority), name_(name)
+kthread::kthread(size_t stack_size, kthread_entry entry, const char *name, int priority):
+    stack_size_(stack_size), entry_(entry), node_(this), priority_(priority), name_(name)
 {
+    stack_ = new uint64_t[stack_size];
     arch_context_setup(&context_, stack_,
             stack_size, entry_);
 }
@@ -24,6 +27,7 @@ kthread::kthread(const char *name, int priority):
 kthread::~kthread()
 {
     scheduler::get().remove_thread(this);
+    delete [] stack_;
 }
 
 scheduler::scheduler(): current_thread_(), need_resched_(false), nearest_tsc_deadline_(-1), idle_thread_("IDLE", 0)

@@ -14,7 +14,7 @@ public:
     waitq &operator=(const waitq &other) = delete;
     ~waitq();
 
-    bool wait(uint64_t timeout_ms = KTHREAD_BLOCK_INF);
+    bool wait(uint64_t timeout_ms = KTHREAD_TIMEOUT_INF);
     void notify_one();
     void notify_all();
 
