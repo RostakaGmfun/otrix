@@ -1,7 +1,6 @@
 #include "kernel/waitq.hpp"
 #include "kernel/kthread.hpp"
 #include "arch/asm.h"
-#include "otrix/immediate_console.hpp"
 
 namespace otrix
 {

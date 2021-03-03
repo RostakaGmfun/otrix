@@ -18,6 +18,11 @@ public:
     void notify_one();
     void notify_all();
 
+    bool empty() const
+    {
+        return nullptr == wq_;
+    }
+
 private:
 
     // Context for blocked thread
