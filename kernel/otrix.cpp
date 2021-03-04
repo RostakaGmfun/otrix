@@ -29,6 +29,7 @@ void otrix_main()
 
     while (1) {
         scheduler::get().schedule();
+        asm volatile("hlt");
     }
 }
 
