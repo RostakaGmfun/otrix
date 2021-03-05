@@ -11,7 +11,7 @@ enum class sockbuf_header_t
 {
     virtio,
     ethernet,
-    ipv4,
+    ip,
     udp,
     tcp,
 

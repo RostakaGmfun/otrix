@@ -3,6 +3,7 @@
 #include "dev/pci.hpp"
 #include "dev/virtio_net.hpp"
 #include "otrix/immediate_console.hpp"
+#include "net/ipv4.hpp"
 
 namespace otrix::net {
 
@@ -13,14 +14,15 @@ static void net_task_entry()
     otrix::dev::virtio_net net(net_dev_pci_handle);
     immediate_console::print("Net device created:\n");
     net.print_info();
+    net::ipv4 ip_layer(&net, net::make_ipv4(20, 0, 0, 1));
     while (1) {
         immediate_console::print("Sending packet\n");
         uint8_t test_packet[16] = { 0 };
-        net::sockbuf buf(net.headers_size(), test_packet, sizeof(test_packet));
-        net::mac_t destination = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-        kerror_t ret = net.write(&buf, destination, ethertype::unknown, KTHREAD_TIMEOUT_INF);
+        net::sockbuf buf(ip_layer.headers_size(), test_packet, sizeof(test_packet));
+        const auto dest = net::make_ipv4(255, 255, 255, 254);
+        kerror_t ret = ip_layer.write(&buf, dest, ipproto_t::udp, KTHREAD_TIMEOUT_INF);
         immediate_console::print("Result: %d\n", ret);
-        scheduler::get().sleep(5000);
+        scheduler::get().sleep(1000);
     }
 }
 
