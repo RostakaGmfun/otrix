@@ -1,12 +1,21 @@
 #pragma once
 
 #include <cstdint>
-#include "net/linkif.hpp"
+#include <cstddef>
+#include "common/error.h"
 
 namespace otrix::net
 {
 
-typedef uint32_t ipv4;
+class linkif;
+
+typedef uint32_t ipv4_t;
+
+enum class ipproto_t: uint8_t
+{
+    tcp = 0x06,
+    udp = 0x10,
+};
 
 /**
  * Represents network (IPv4) layer
@@ -14,11 +23,14 @@ typedef uint32_t ipv4;
 class netif
 {
 public:
-    netif(linkif *link, ipv4 addr);
+    netif(linkif *link, ipv4_t addr);
+
+    kerror_t write(const void *data, size_t data_size, const ipv4_t &dest, ipproto_t proto, uint64_t timeout_ms);
+    size_t read(void *data, size_t max_size, ipv4_t *dest, ipproto_t *proto, uint64_t timeout_ms);
 
 private:
     linkif *link_;
-    ipv4 addr_;
+    ipv4_t addr_;
 };
 
 } // namespace otrix::net

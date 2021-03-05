@@ -62,6 +62,7 @@ virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev)
     }
 
     init_finished();
+
     tx_buffer_ = (uint8_t *)otrix::alloc(MTU + sizeof(virtio_net_hdr) + sizeof(net::ethernet_hdr));
     if (nullptr == tx_buffer_) {
         immediate_console::print("Failed to allocate TX buffer\n");
@@ -76,6 +77,8 @@ virtio_net::~virtio_net()
     if (nullptr != rx_q_) {
         virtq_destroy(rx_q_);
     }
+
+    otrix::free(tx_buffer_);
 }
 
 void virtio_net::print_info()
@@ -97,40 +100,39 @@ void virtio_net::get_mac(net::mac_t *mac)
     (*mac)[5] = read_reg(mac_5);
 }
 
-kerror_t virtio_net::write(const void *data, size_t size, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms)
+kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms)
 {
-    if (size > MTU) {
-        return E_NOMEM;
-    }
-
-    virtio_net_hdr *hdr = reinterpret_cast<virtio_net_hdr *>(tx_buffer_);
-    memset(hdr, 0, sizeof(*hdr));
-
-    net::ethernet_hdr *e_hdr = reinterpret_cast<net::ethernet_hdr *>(tx_buffer_ + sizeof(*hdr));
+    using namespace net;
+    ethernet_hdr *e_hdr = reinterpret_cast<ethernet_hdr *>(data->add_header(sizeof(ethernet_hdr), sockbuf_header_t::ethernet));
     memcpy(&e_hdr->dmac, &dest, sizeof(dest));
     get_mac(&e_hdr->smac);
     if (net::ethertype::unknown == type) {
-        e_hdr->ethertype = htons(size);
+        e_hdr->ethertype = htons(data->size() - sizeof(ethernet_hdr));
     } else {
         e_hdr->ethertype = htons(static_cast<uint16_t>(type));
     }
-    memcpy(tx_buffer_ + sizeof(*hdr) + sizeof(*e_hdr), data, size);
-    kerror_t ret = virtq_send_buffer(tx_q_, tx_buffer_, sizeof(*hdr) + sizeof(*e_hdr) + size, false);
+    virtio_net_hdr *v_hdr = reinterpret_cast<virtio_net_hdr *>(data->add_header(sizeof(virtio_net_hdr), sockbuf_header_t::virtio));
+    memset(v_hdr, 0, sizeof(*v_hdr));
+
+    immediate_console::print("Sending %p %lu\n", data->data(), data->size());
+    kerror_t ret = virtq_send_buffer(tx_q_, data->data(), data->size(), false);
     if (E_OK != ret) {
         return ret;
     }
     return tx_complete_.take(timeout_ms) ? E_OK : E_TOUT;
 }
 
-size_t virtio_net::read(void *data, size_t size, net::mac_t *src, net::ethertype *type, uint64_t timeout_ms)
+net::sockbuf *virtio_net::read(net::mac_t *src, net::ethertype *type, uint64_t timeout_ms)
 {
-
-    (void)data;
-    (void)size;
     (void)src;
     (void)type;
     (void)timeout_ms;
     return 0;
+}
+
+size_t virtio_net::headers_size() const
+{
+    return sizeof(virtio_net_hdr) + sizeof(net::ethernet_hdr);
 }
 
 uint32_t virtio_net::negotiate_features(uint32_t device_features)

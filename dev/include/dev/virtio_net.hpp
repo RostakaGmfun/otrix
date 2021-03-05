@@ -26,8 +26,10 @@ public:
 
     void get_mac(net::mac_t *p_out) override;
 
-    kerror_t write(const void *data, size_t size, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms) override;
-    size_t read(void *data, size_t size, net::mac_t *src, net::ethertype *type, uint64_t timeout_ms) override;
+    kerror_t write(net::sockbuf *data, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms) override;
+    net::sockbuf *read(net::mac_t *src, net::ethertype *type, uint64_t timeout_ms) override;
+
+    size_t headers_size() const override;
 
 protected:
     uint32_t negotiate_features(uint32_t device_features) override;

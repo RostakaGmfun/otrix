@@ -16,8 +16,9 @@ static void net_task_entry()
     while (1) {
         immediate_console::print("Sending packet\n");
         uint8_t test_packet[16] = { 0 };
+        net::sockbuf buf(net.headers_size(), test_packet, sizeof(test_packet));
         net::mac_t destination = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-        kerror_t ret = net.write(test_packet, sizeof(test_packet), destination, ethertype::unknown, KTHREAD_TIMEOUT_INF);
+        kerror_t ret = net.write(&buf, destination, ethertype::unknown, KTHREAD_TIMEOUT_INF);
         immediate_console::print("Result: %d\n", ret);
         scheduler::get().sleep(5000);
     }
