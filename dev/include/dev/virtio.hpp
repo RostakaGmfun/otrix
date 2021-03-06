@@ -61,6 +61,8 @@ protected:
         uint32_t len;
     } __attribute__((packed));
 
+    typedef void (*vq_irq_handler_t)(void *ctx, void *data, size_t len);
+
     struct virtq {
         int index;
         uint16_t size;
@@ -70,7 +72,11 @@ protected:
         volatile uint16_t *avail_ring;
         volatile virtio_ring_hdr *used_ring_hdr;
         volatile virtio_used_elem *used_ring;
-        int num_used_descriptors;
+        uint16_t used_idx;
+        int num_free_descriptors;
+        int free_list;
+        vq_irq_handler_t irq_handler;
+        void *irq_handler_ctx;
     };
 
     /**
@@ -84,7 +90,7 @@ protected:
      * @retval ENODEV Available queue size is 0.
      * @retval E_OK Queue created
      */
-    kerror_t virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *) = nullptr, void *p_handler_context = nullptr);
+    kerror_t virtq_create(uint16_t index, virtq **p_out_virtq, vq_irq_handler_t = nullptr, void *p_handler_context = nullptr);
 
     kerror_t virtq_destroy(virtq *p_vq);
 
@@ -100,6 +106,9 @@ protected:
     void init_finished();
 
     pci_dev *pci_dev_;
+
+private:
+    static void handle_vq_irq(void *ctx);
 
 private:
     bool valid_;

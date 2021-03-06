@@ -114,7 +114,6 @@ kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethe
     virtio_net_hdr *v_hdr = reinterpret_cast<virtio_net_hdr *>(data->add_header(sizeof(virtio_net_hdr), sockbuf_header_t::virtio));
     memset(v_hdr, 0, sizeof(*v_hdr));
 
-    immediate_console::print("Sending %p %lu\n", data->data(), data->size());
     kerror_t ret = virtq_send_buffer(tx_q_, data->data(), data->size(), false);
     if (E_OK != ret) {
         return ret;
@@ -183,8 +182,10 @@ void virtio_net::write_reg(uint16_t reg, uint32_t value)
     }
 }
 
-void virtio_net::tx_completion_event(void *ctx)
+void virtio_net::tx_completion_event(void *ctx, void *data, size_t size)
 {
+    (void)data;
+    (void)size;
     virtio_net *p_this = (virtio_net *)ctx;
     p_this->tx_complete_.give();
 }

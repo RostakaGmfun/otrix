@@ -36,8 +36,6 @@ protected:
 
 private:
 
-    static void tx_irq_handler(void *p_ctx);
-
     virtq *tx_q_;
     virtq *rx_q_;
 };

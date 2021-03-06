@@ -50,7 +50,7 @@ protected:
 
 private:
 
-    static void tx_completion_event(void *ctx);
+    static void tx_completion_event(void *ctx, void *data, size_t size);
 
     virtq *tx_q_;
     virtq *rx_q_;

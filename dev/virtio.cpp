@@ -78,11 +78,6 @@ void virtio_dev::print_info()
         }
     } while (queue_idx != 0);
     immediate_console::print("\n");
-    //uint64_t msix_table_addr = 0;
-    //uint32_t msix_table_size = 0;
-    //pci_get_msix_table_address(pci_dev_, &msix_table_addr);
-    //pci_get_msix_table_size(pci_dev_, &msix_table_size);
-    //immediate_console::print("MSIX table @ %p, size %d\n", msix_table_addr, msix_table_size);
 }
 
 uint32_t virtio_dev::read_reg(uint16_t reg)
@@ -131,7 +126,7 @@ void virtio_dev::write_reg(uint16_t reg, uint32_t value)
     }
 }
 
-kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_handler)(void *), void *p_handler_context)
+kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, vq_irq_handler_t p_handler, void *p_handler_context)
 {
     write_reg(queue_select, index);
     const uint16_t queue_len = read_reg(queue_size);
@@ -154,6 +149,8 @@ kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_
 
     p_vq->index = index;
     p_vq->size = queue_len;
+    p_vq->irq_handler = p_handler;
+    p_vq->irq_handler_ctx = p_handler_context;
     // 4095 to adjust the descriptor pointer to be 4kb aligned
     // TODO: Instead of relying on root heap allocator implement page allocator
     const size_t alloc_size = virtq_size + 4095;
@@ -168,17 +165,21 @@ kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, void (*p_
     p_vq->avail_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table + descriptor_table_size);
     p_vq->avail_ring = (uint16_t *)((uint8_t *)p_vq->avail_ring_hdr + sizeof(virtio_ring_hdr));
     p_vq->used_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table + vq_align(descriptor_table_size + available_ring_size));
-    p_vq->used_ring = (virtio_used_elem *)((uint8_t *)p_vq->used_ring_hdr);
+    p_vq->used_ring = (virtio_used_elem *)((uint8_t *)p_vq->used_ring_hdr + sizeof(virtio_ring_hdr));
+
+    for (int i = 0; i < p_vq->size - 1; i++) {
+        p_vq->desc_table[i].next = i + 1;
+    }
+    p_vq->desc_table[p_vq->size - 1].next = -1;
+    p_vq->num_free_descriptors = p_vq->size;
 
     write_reg(queue_address, (uintptr_t)p_vq->desc_table >> 12);
 
     *p_out_virtq = p_vq;
 
-    if (nullptr != p_handler) {
-        auto [err, msix_vector] = pci_dev_->request_msix(p_handler, "VQ", p_handler_context);
-        if (E_OK == err) {
-            write_reg(queue_msix_vector, msix_vector);
-        }
+    auto [err, msix_vector] = pci_dev_->request_msix(handle_vq_irq, "VQ", p_vq);
+    if (E_OK == err) {
+        write_reg(queue_msix_vector, msix_vector);
     }
 
     immediate_console::print("Created VQ%d @ %p, msix %04x\n", p_vq->index, p_vq->desc_table, read_reg(queue_msix_vector));
@@ -207,20 +208,25 @@ kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buf
         return E_INVAL;
     }
 
-    // TODO: Implement free list in the descriptor table
-    if (p_vq->num_used_descriptors == p_vq->size) {
+    if (p_vq->free_list == -1 || 0 == p_vq->num_free_descriptors) {
         return E_NOMEM;
     }
 
-    const int idx = p_vq->num_used_descriptors++;
+    auto flags = arch_irq_save();
+    const int idx = p_vq->free_list;
+    p_vq->free_list = p_vq->desc_table[idx].next;
+    arch_irq_restore(flags);
+
+    immediate_console::print("Using desc id: %d\n", idx);
+    p_vq->num_free_descriptors--;
     volatile virtio_descriptor *p_desc = &p_vq->desc_table[idx];
     p_desc->addr = (uint64_t)p_buffer;
     p_desc->len = buffer_size;
     p_desc->flags = device_writable ? VIRTQ_DESC_F_WRITE : 0;
     p_desc->next = 0;
 
-    p_vq->avail_ring[p_vq->avail_ring_hdr->idx] = idx;
-    const int avail_index = (p_vq->avail_ring_hdr->idx + 1) % p_vq->size;
+    p_vq->avail_ring[p_vq->avail_ring_hdr->idx % p_vq->size] = idx;
+    const int avail_index = p_vq->avail_ring_hdr->idx + 1;
 
     // Memory barrier to make sure all changes are visible to the device when index is updated
     __sync_synchronize();
@@ -241,6 +247,22 @@ uint32_t virtio_dev::negotiate_features(uint32_t device_features)
 void virtio_dev::init_finished()
 {
     write_reg(device_status, read_reg(device_status) | virtio_device_status::driver_ok);
+}
+
+void virtio_dev::handle_vq_irq(void *ctx)
+{
+    virtq *p_vq = reinterpret_cast<virtq *>(ctx);
+    while (p_vq->used_idx != p_vq->used_ring_hdr->idx) {
+        const int desc_id = p_vq->used_ring[p_vq->used_idx % p_vq->size].id;
+        volatile virtio_descriptor *p_desc = &p_vq->desc_table[desc_id];
+        if (nullptr != p_vq->irq_handler) {
+            p_vq->irq_handler(p_vq->irq_handler_ctx, reinterpret_cast<void *>(p_desc->addr), p_desc->len);
+        }
+        p_desc->next = p_vq->free_list;
+        p_vq->free_list = desc_id;
+        p_vq->used_idx++;
+        p_vq->num_free_descriptors++;
+    }
 }
 
 } // namespace otrix::dev
