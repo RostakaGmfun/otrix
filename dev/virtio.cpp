@@ -217,7 +217,6 @@ kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buf
     p_vq->free_list = p_vq->desc_table[idx].next;
     arch_irq_restore(flags);
 
-    immediate_console::print("Using desc id: %d\n", idx);
     p_vq->num_free_descriptors--;
     volatile virtio_descriptor *p_desc = &p_vq->desc_table[idx];
     p_desc->addr = (uint64_t)p_buffer;

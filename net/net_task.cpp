@@ -4,6 +4,8 @@
 #include "dev/virtio_net.hpp"
 #include "otrix/immediate_console.hpp"
 #include "net/ipv4.hpp"
+#include "net/sockbuf.hpp"
+#include "net/arp.hpp"
 
 namespace otrix::net {
 
@@ -14,7 +16,9 @@ static void net_task_entry()
     otrix::dev::virtio_net net(net_dev_pci_handle);
     immediate_console::print("Net device created:\n");
     net.print_info();
-    net::ipv4 ip_layer(&net, net::make_ipv4(20, 0, 0, 1));
+    net::ipv4 ip_layer(&net, net::make_ipv4(20, 0, 0, 2));
+    net::arp arp_layer(&net, ip_layer.get_addr());
+    arp_layer.announce();
     while (1) {
         immediate_console::print("Sending packet\n");
         uint8_t test_packet[16] = { 0 };

@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <cstddef>
 #include "common/error.h"
-#include "net/sockbuf.hpp"
 
 namespace otrix::net
 {
 
 class linkif;
+class sockbuf;
 
 typedef uint32_t ipv4_t;
 
@@ -35,6 +35,11 @@ public:
     sockbuf *read(ipv4_t *dest, ipproto_t *proto, uint64_t timeout_ms);
 
     size_t headers_size() const;
+
+    ipv4_t get_addr() const
+    {
+        return addr_;
+    }
 
 private:
     linkif *link_;

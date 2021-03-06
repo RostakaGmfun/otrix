@@ -1,6 +1,7 @@
 #include "net/ipv4.hpp"
 #include "net/linkif.hpp"
 #include "common/utils.h"
+#include "net/sockbuf.hpp"
 
 namespace otrix::net
 {

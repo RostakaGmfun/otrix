@@ -3,12 +3,11 @@
 #include <stddef.h>
 #include "common/error.h"
 #include "net/ethernet.hpp"
-#include "net/sockbuf.hpp"
 
 namespace otrix::net
 {
 
-typedef uint8_t mac_t[6];
+class sockbuf;
 
 /**
  * Represents link layer
