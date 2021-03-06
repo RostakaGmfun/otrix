@@ -127,6 +127,16 @@ public:
      */
     kerror_t schedule();
 
+    /**
+     * Disable task switching.
+     */
+    void preempt_disable();
+
+    /**
+     * Enable task switching.
+     */
+    void preempt_enable(bool reschedule = true);
+
 private:
     scheduler();
 
@@ -142,6 +152,7 @@ private:
     uint64_t nearest_tsc_deadline_;
 
     kthread idle_thread_;
+    int preempt_disable_;
 };
 
 } // namespace otrix

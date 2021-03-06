@@ -30,7 +30,8 @@ kthread::~kthread()
     delete [] stack_;
 }
 
-scheduler::scheduler(): current_thread_(), need_resched_(false), nearest_tsc_deadline_(-1), idle_thread_("IDLE", 0)
+scheduler::scheduler(): current_thread_(), need_resched_(false), nearest_tsc_deadline_(-1),
+                        idle_thread_("IDLE", 0), preempt_disable_(0)
 {
     for (int i = 0; i < NUM_PRIORITIES; i++) {
         runnable_queues_[i] = nullptr;
@@ -55,7 +56,8 @@ kerror_t scheduler::add_thread(kthread *thread)
     const int prio = thread->priority();
     const auto flags = arch_irq_save();
     thread->node()->state = KTHREAD_STATE_RUNNABLE;
-    runnable_queues_[prio] = intrusive_list_push_back(runnable_queues_[prio], &thread->node()->list_node);
+    runnable_queues_[prio] = intrusive_list_push_back(runnable_queues_[prio],
+            &thread->node()->list_node);
     if (nullptr != current_thread_ && KTHREAD_PTR(current_thread_)->priority() < prio) {
         need_resched_ = true;
     }
@@ -72,16 +74,22 @@ kerror_t scheduler::remove_thread(kthread *thread)
 
     const int prio = thread->priority();
     thread->node()->state = KTHREAD_STATE_ZOMBIE;
-    runnable_queues_[prio] = intrusive_list_delete(runnable_queues_[prio], &thread->node()->list_node);
+    runnable_queues_[prio] = intrusive_list_delete(runnable_queues_[prio],
+            &thread->node()->list_node);
     arch_irq_restore(flags);
     return E_OK;
 }
 
 kerror_t scheduler::schedule()
 {
+    auto flags = arch_irq_save();
+    if (preempt_disable_ > 0) {
+        arch_irq_restore(flags);
+        return E_OK;
+    }
+
     need_resched_ = false;
     intrusive_list *prev_thread = current_thread_;
-    auto flags = arch_irq_save();
 
     int prio = NUM_PRIORITIES - 1;
     // Select highest-priority thread from the run queues
@@ -169,6 +177,25 @@ kerror_t scheduler::wake(kthread *thread)
     arch_irq_restore(flags);
 
     return E_OK;
+}
+
+void scheduler::preempt_disable()
+{
+    auto flags = arch_irq_save();
+    preempt_disable_++;
+    arch_irq_restore(flags);
+}
+
+void scheduler::preempt_enable(bool reschedule)
+{
+    auto flags = arch_irq_save();
+    if (preempt_disable_ > 0) {
+        preempt_disable_--;
+        if (0 == preempt_disable_ && reschedule && need_resched_) {
+            schedule();
+        }
+    }
+    arch_irq_restore(flags);
 }
 
 void scheduler::handle_timer_irq(void *p_ctx)

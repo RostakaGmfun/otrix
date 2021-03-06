@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <otrix/immediate_console.hpp>
+#include "kernel/kthread.hpp"
 
 extern "C" void arch_used_irq_handler(void *ctx);
 extern "C" void arch_unused_irq_handler(void *ctx);
@@ -100,6 +101,7 @@ irq_manager::idt_pointer irq_manager::generate_idt()
 
 void irq_manager::irq_handler()
 {
+    scheduler::get().preempt_disable();
     const int irq_n = local_apic::get_active_irq();
 
     local_apic::signal_eoi();
@@ -110,6 +112,7 @@ void irq_manager::irq_handler()
             irq_table[irq_n].handler(irq_table[irq_n].p_context);
         }
     }
+    scheduler::get().preempt_enable();
 }
 
 } // namespace otrix::arch
