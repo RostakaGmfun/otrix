@@ -20,8 +20,12 @@ public:
     bool take(uint64_t timeout_ms = -1);
     void give();
 
-private:
+    int count() const
+    {
+        return count_;
+    }
 
+private:
     waitq waiting_queue_;
     int count_;
     int max_count_;
