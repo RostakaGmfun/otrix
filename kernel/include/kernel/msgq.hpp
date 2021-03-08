@@ -34,7 +34,7 @@ public:
     bool write(const void *msg);
 
     bool full() const {
-        return sem_.count() == 0;
+        return sem_.count() == (int)size_;
     }
 
 private:
