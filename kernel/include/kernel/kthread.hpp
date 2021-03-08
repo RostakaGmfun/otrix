@@ -17,8 +17,7 @@
 namespace otrix
 {
 
-// TODO(RostakaGmfun): Add more type safety
-using kthread_entry = void(*)();
+using kthread_entry = void(*)(void *);
 
 enum kthread_state {
     KTHREAD_STATE_ZOMBIE,  /**< Not present int any of the thread queues **/
@@ -33,7 +32,7 @@ enum kthread_state {
 class kthread
 {
 public:
-    kthread(size_t stack_size, kthread_entry entry, const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
+    kthread(size_t stack_size, kthread_entry entry, const char *name, int priority = KTHREAD_DEFAULT_PRIORITY, void *ctx = nullptr);
     kthread(const char *name, int priority = KTHREAD_DEFAULT_PRIORITY);
     kthread(const kthread &other) = delete;
     kthread(kthread &&other) = delete;

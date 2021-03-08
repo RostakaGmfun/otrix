@@ -52,3 +52,8 @@ arch_context_switch:
     mov 48(%rsi), %rsp
     mov 56(%rsi), %rbp
     ret
+
+.global arch_context_thread_entry
+arch_context_thread_entry:
+    pop %rdi
+    ret

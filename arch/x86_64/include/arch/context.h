@@ -36,16 +36,18 @@ void arch_context_switch(struct arch_context *prev, struct arch_context *next);
 
 static inline void arch_context_setup(struct arch_context *ctx,
         uint64_t *stack, const size_t stack_size,
-        void(*entry)(void))
+        void(*entry)(void *), void *thread_ctx)
 {
     memset(ctx, 0, sizeof(*ctx));
     // Copy current RFLAGS into the context RFLAGS
 	asm volatile("pushfq ; popq %0;" : "=rm" (ctx->rflags) : : "memory");
 
-    uint64_t *stack_ptr = (uint64_t *)((uint8_t *)stack + stack_size);
-    // TODO(RostakaGmfun): Parameter passing
-    stack_ptr[-1] = (uint64_t)entry;
-    ctx->rsp = (uint64_t)stack_ptr - 8;
+    uint64_t *stack_ptr = (uint64_t *)((uint8_t *)stack + stack_size - 8 * 3);
+    extern void arch_context_thread_entry(void);
+    stack_ptr[0] = (uint64_t)arch_context_thread_entry;
+    stack_ptr[1] = (uint64_t)thread_ctx;
+    stack_ptr[2] = (uint64_t)entry;
+    ctx->rsp = (uint64_t)stack_ptr;
 }
 
 #ifdef __cplusplus

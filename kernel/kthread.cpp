@@ -9,12 +9,12 @@
 namespace otrix
 {
 
-kthread::kthread(size_t stack_size, kthread_entry entry, const char *name, int priority):
+kthread::kthread(size_t stack_size, kthread_entry entry, const char *name, int priority, void *ctx):
     stack_size_(stack_size), entry_(entry), node_(this), priority_(priority), name_(name)
 {
     stack_ = new uint64_t[stack_size];
     arch_context_setup(&context_, stack_,
-            stack_size, entry_);
+            stack_size, entry_, ctx);
 }
 
 kthread::kthread(const char *name, int priority):
