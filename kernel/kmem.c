@@ -23,7 +23,7 @@ void *kmem_alloc(kmem_heap_t *heap_desc, size_t size) {
 
     struct intrusive_list *p_free = heap_desc->free_list;
     do {
-        if (size >= KMEM_FREE_BLOCK_PTR(p_free)->size) {
+        if (size <= KMEM_FREE_BLOCK_PTR(p_free)->size) {
             break;
         }
         p_free = p_free->next;

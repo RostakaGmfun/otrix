@@ -4,6 +4,10 @@
 #include "net/linkif.hpp"
 #include "common/utils.h"
 #include "kernel/semaphore.hpp"
+#include "kernel/msgq.hpp"
+#include "kernel/kthread.hpp"
+
+#include <tuple>
 
 namespace otrix::dev
 {
@@ -27,7 +31,7 @@ public:
     void get_mac(net::mac_t *p_out) override;
 
     kerror_t write(net::sockbuf *data, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms) override;
-    net::sockbuf *read(net::mac_t *src, net::ethertype *type, uint64_t timeout_ms) override;
+    kerror_t subscribe_to_rx(net::ethertype type, net::l2_handler_t p_handler, void *ctx) override;
 
     size_t headers_size() const override;
 
@@ -51,14 +55,22 @@ protected:
 private:
 
     static void tx_completion_event(void *ctx, void *data, size_t size);
+    static void rx_handler(void *ctx, void *data, size_t size);
+    void rx_thread();
 
     virtq *tx_q_;
     virtq *rx_q_;
 
     semaphore tx_complete_;
-    uint8_t *tx_buffer_;
 
-    static constexpr auto MTU = 1500;
+    static constexpr auto MAX_RX_HANDLERS = 2;
+    std::tuple<net::ethertype, net::l2_handler_t, void *> rx_handlers_[MAX_RX_HANDLERS];
+
+    msgq rx_packet_queue_;
+    kthread rx_thread_;
+    net::mac_t addr_;
+
+    static constexpr auto MTU = 1514;
 };
 
 } // namespace otrix::dev

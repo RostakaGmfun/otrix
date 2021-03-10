@@ -2,8 +2,10 @@
 #include "otrix/immediate_console.hpp"
 #include "arch/asm.h"
 #include "kernel/alloc.hpp"
-#include "net/ethernet.hpp"
+#include "kernel/kthread.hpp"
 #include "common/utils.h"
+#include "net/ethernet.hpp"
+#include "net/sockbuf.hpp"
 
 #define VIRTIO_NET_S_LINK_UP  1
 #define VIRTIO_NET_S_ANNOUNCE 2
@@ -47,7 +49,8 @@ struct virtio_net_hdr
 
 using otrix::immediate_console;
 
-virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev)
+virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev), rx_packet_queue_(16, sizeof(net::sockbuf *)),
+                                        rx_thread_(64 * 1024, [] (void *ctx) { ((virtio_net *)ctx)->rx_thread(); }, "virtio_net-RX", 3, this)
 {
     begin_init();
 
@@ -56,17 +59,21 @@ virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev)
         immediate_console::print("Failed to create TX queue\n");
     }
 
-    ret = virtq_create(0, &rx_q_);
+    ret = virtq_create(0, &rx_q_, rx_handler, this);
     if (E_OK != ret) {
         immediate_console::print("Failed to create RX queue\n");
     }
 
     init_finished();
 
-    tx_buffer_ = (uint8_t *)otrix::alloc(MTU + sizeof(virtio_net_hdr) + sizeof(net::ethernet_hdr));
-    if (nullptr == tx_buffer_) {
-        immediate_console::print("Failed to allocate TX buffer\n");
-    }
+    addr_[0] = read_reg(mac_0);
+    addr_[1] = read_reg(mac_1);
+    addr_[2] = read_reg(mac_2);
+    addr_[3] = read_reg(mac_3);
+    addr_[4] = read_reg(mac_4);
+    addr_[5] = read_reg(mac_5);
+
+    scheduler::get().add_thread(&rx_thread_);
 }
 
 virtio_net::~virtio_net()
@@ -77,8 +84,6 @@ virtio_net::~virtio_net()
     if (nullptr != rx_q_) {
         virtq_destroy(rx_q_);
     }
-
-    otrix::free(tx_buffer_);
 }
 
 void virtio_net::print_info()
@@ -92,12 +97,7 @@ void virtio_net::print_info()
 
 void virtio_net::get_mac(net::mac_t *mac)
 {
-    (*mac)[0] = read_reg(mac_0);
-    (*mac)[1] = read_reg(mac_1);
-    (*mac)[2] = read_reg(mac_2);
-    (*mac)[3] = read_reg(mac_3);
-    (*mac)[4] = read_reg(mac_4);
-    (*mac)[5] = read_reg(mac_5);
+    memcpy(mac, addr_, sizeof(addr_));
 }
 
 kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms)
@@ -121,12 +121,20 @@ kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethe
     return tx_complete_.take(timeout_ms) ? E_OK : E_TOUT;
 }
 
-net::sockbuf *virtio_net::read(net::mac_t *src, net::ethertype *type, uint64_t timeout_ms)
+kerror_t virtio_net::subscribe_to_rx(net::ethertype type, net::l2_handler_t p_handler, void *ctx)
 {
-    (void)src;
-    (void)type;
-    (void)timeout_ms;
-    return 0;
+    auto flags = arch_irq_save();
+    for (int i = 0; i < MAX_RX_HANDLERS; i++) {
+        if (net::ethertype::unknown == std::get<0>(rx_handlers_[i])) {
+            std::get<0>(rx_handlers_[i]) = type;
+            std::get<1>(rx_handlers_[i]) = p_handler;
+            std::get<2>(rx_handlers_[i]) = ctx;
+            arch_irq_restore(flags);
+            return E_OK;
+        }
+    }
+    arch_irq_restore(flags);
+    return E_NOMEM;
 }
 
 size_t virtio_net::headers_size() const
@@ -190,5 +198,61 @@ void virtio_net::tx_completion_event(void *ctx, void *data, size_t size)
     p_this->tx_complete_.give();
 }
 
+void virtio_net::rx_handler(void *ctx, void *data, size_t size)
+{
+    virtio_net *p_this = (virtio_net *)ctx;
+    if (p_this->rx_packet_queue_.full()) {
+        return;
+    }
+    const auto skb_free_func = [] (void *buf, size_t size, void *ctx) {
+        // Return buffer to the rx queue
+        virtio_net *p_this = (virtio_net *)ctx;
+        p_this->virtq_send_buffer(p_this->rx_q_, buf, size, true);
+    };
+    // Create zero-copy socket buffer
+    // TODO: get rid of memory allocation in IRQ handler
+    net::sockbuf *skb = new net::sockbuf((uint8_t *)data, size, skb_free_func, p_this);
+    if (nullptr == skb) {
+        return;
+    }
+    if (!p_this->rx_packet_queue_.write(&skb)) {
+        // Most likely impossible, because interrupt nesting is disabled
+        delete skb;
+    }
+}
+
+void virtio_net::rx_thread()
+{
+    using namespace net;
+    immediate_console::print("virtio-net rx thread started\n");
+
+    for (int i = 0; i < 16; i++) {
+        void *buf = otrix::alloc(MTU + sizeof(virtio_net_hdr));
+        // TODO: destroy thread and free buffers in virtio_net desctructor
+        virtq_send_buffer(rx_q_, buf, MTU + sizeof(virtio_net_hdr), true);
+    }
+    while (1) {
+        sockbuf *skb = nullptr;
+        rx_packet_queue_.read(&skb, -1);
+        skb->add_parsed_header(sizeof(virtio_net_hdr), sockbuf_header_t::virtio);
+        skb->add_parsed_header(sizeof(ethernet_hdr), sockbuf_header_t::ethernet);
+        const ethernet_hdr *e_hdr = (const ethernet_hdr *)skb->header(sockbuf_header_t::ethernet);
+        const mac_t broadcast_mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+        if (0 != memcmp(e_hdr->dmac, broadcast_mac, sizeof(e_hdr->dmac)) &&
+            0 != memcmp(e_hdr->dmac, addr_, sizeof(e_hdr->dmac)))
+        {
+            delete skb;
+            continue;
+        }
+
+        for (const auto handler : rx_handlers_) {
+            if (std::get<0>(handler) == (ethertype)htons(e_hdr->ethertype)) {
+                std::get<1>(handler)(skb, std::get<2>(handler));
+            }
+        }
+
+        delete skb;
+    }
+}
 
 } // namespace otrix::dev

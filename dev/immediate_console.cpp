@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdarg>
 #include <cstdio>
+#include "arch/asm.h"
 
 namespace otrix
 {
@@ -29,17 +30,20 @@ void immediate_console::init()
 
 void immediate_console::print(const char *format, ...)
 {
+    auto flags = arch_irq_save();
     va_list ap;
     va_start(ap, format);
     int size = vsnprintf(message_buffer_, buffer_size_, format, ap);
     va_end(ap);
 
     if (size < 0) {
+        arch_irq_restore(flags);
         return;
     }
 
     serial_write(&immediate_com_port,
             (const uint8_t *)message_buffer_, size);
+    arch_irq_restore(flags);
 }
 
 } // namespace otrix

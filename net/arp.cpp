@@ -63,7 +63,7 @@ void arp::process_packet(sockbuf *data)
     }
     const arp_header_ipv4 *p_arp = (arp_header_ipv4 *)data->payload();
 
-    if (htons(p_arp->operation) == ARP_REQUEST && ntohl(p_arp->target_ip) == ip_addr_) {
+    if (p_arp->operation == ntohs(ARP_REQUEST) && ntohl(p_arp->target_ip) == ip_addr_) {
         send_reply(ip_addr_, p_arp->sender_mac, p_arp->sender_ip);
     }
 
