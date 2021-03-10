@@ -209,8 +209,6 @@ void scheduler::handle_timer_irq()
     nearest_tsc_deadline_ = static_cast<uint64_t>(-1);
 
     for (int p = NUM_PRIORITIES - 1; p >= 0; p--) {
-        if (nullptr != blocked_queues_[p]) {
-        }
         while (nullptr != blocked_queues_[p] && KTHREAD_NODE_PTR(blocked_queues_[p])->tsc_deadline < arch_tsc()) {
             auto thread = KTHREAD_PTR(blocked_queues_[p]);
             wake(thread);

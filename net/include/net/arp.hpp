@@ -20,11 +20,10 @@ public:
 
     bool get_mac(ipv4_t addr, mac_t *p_mac);
 
-    void process_packet(sockbuf *data);
-
     kerror_t announce();
 
 private:
+    void process_packet(sockbuf *data);
     kerror_t send_reply(ipv4_t addr, const mac_t &target_mac, ipv4_t target_ip);
 
     static constexpr auto TABLE_SIZE = 4;

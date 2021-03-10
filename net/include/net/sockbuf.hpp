@@ -103,6 +103,11 @@ public:
         payload_ += header_size;
     }
 
+    void set_payload_size(size_t new_size)
+    {
+        payload_size_ = new_size;
+    }
+
     const uint8_t *header(sockbuf_header_t type) const
     {
         return headers_[(int)type];
