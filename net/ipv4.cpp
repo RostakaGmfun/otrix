@@ -23,6 +23,7 @@ kerror_t ipv4::write(sockbuf *data, ipv4_t dest, ipproto_t proto, uint64_t timeo
 {
     mac_t destination;
     if (!arp_->resolve(gateway_, &destination, timeout_ms)) {
+        immediate_console::print("Unreachable destination %08x via %08x\n", dest, gateway_);
         return E_UNREACHABLE;
     }
 
@@ -41,7 +42,6 @@ kerror_t ipv4::write(sockbuf *data, ipv4_t dest, ipproto_t proto, uint64_t timeo
     const uint16_t csum_computed = ip_checksum((const uint8_t *)hdr, sizeof(ip_hdr));
 
     hdr->csum = csum_computed;
-    immediate_console::print("Sending packet of type %d to %08x\n", proto, dest);
     return link_->write(data, destination, ethertype::ipv4, timeout_ms);
 }
 
@@ -91,8 +91,6 @@ void ipv4::process_packet(sockbuf *data)
 
     const size_t len = ntohs(p_hdr->len) - sizeof(ip_hdr);
     data->set_payload_size(len);
-
-    immediate_console::print("Got IPv4 packet of type %d\n", p_hdr->proto);
 
     for (const auto handler : rx_handlers_) {
         if (std::get<0>(handler) == (ipproto_t)p_hdr->proto) {

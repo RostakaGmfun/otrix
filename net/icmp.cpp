@@ -35,8 +35,6 @@ void icmp::process_packet(sockbuf *data)
     data->add_parsed_header(sizeof(icmp_v4_hdr), sockbuf_header_t::icmp);
     const icmp_v4_hdr *p_hdr = (icmp_v4_hdr *)data->header(sockbuf_header_t::icmp);
 
-    immediate_console::print("Got ICMP packet of type %d\n", p_hdr->type);
-
     switch (p_hdr->type) {
     case echo:
         process_echo_request(data);

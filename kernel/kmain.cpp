@@ -9,8 +9,9 @@
 #include "otrix/immediate_console.hpp"
 #include "arch/paging.hpp"
 #include "arch/multiboot2.h"
-#include "kernel/kmem.h"
+#include "kernel/kmem.hpp"
 #include "arch/kvmclock.hpp"
+#include "kernel/alloc.hpp"
 
 using otrix::immediate_console;
 using otrix::kthread;
@@ -60,6 +61,13 @@ void free(void *ptr)
 {
     long flags = arch_irq_save();
     kmem_free(&root_heap, ptr);
+    arch_irq_restore(flags);
+}
+
+void print_free()
+{
+    auto flags = arch_irq_save();
+    kmem_print_free(&root_heap);
     arch_irq_restore(flags);
 }
 
