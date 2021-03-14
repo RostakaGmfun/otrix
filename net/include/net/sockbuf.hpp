@@ -35,7 +35,9 @@ public:
         if (nullptr != start_) {
             head_ = (uint8_t *)start_ + headers_size;
             payload_ = head_;
-            memcpy(payload_, payload, payload_size);
+            if (nullptr != payload) {
+                memcpy(payload_, payload, payload_size);
+            }
             for (auto &hdr : headers_) {
                 hdr = nullptr;
             }
@@ -143,6 +145,11 @@ public:
     }
 
     const uint8_t *payload() const
+    {
+        return payload_;
+    }
+
+    uint8_t *payload()
     {
         return payload_;
     }
