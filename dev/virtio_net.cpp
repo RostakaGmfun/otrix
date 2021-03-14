@@ -114,6 +114,7 @@ kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethe
     virtio_net_hdr *v_hdr = reinterpret_cast<virtio_net_hdr *>(data->add_header(sizeof(virtio_net_hdr), sockbuf_header_t::virtio));
     memset(v_hdr, 0, sizeof(*v_hdr));
 
+    immediate_console::print("[link] Sending packet of type %d\n", type);
     kerror_t ret = virtq_send_buffer(tx_q_, data->data(), data->size(), false);
     if (E_OK != ret) {
         return ret;

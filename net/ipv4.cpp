@@ -1,13 +1,15 @@
 #include "net/ipv4.hpp"
 #include "net/linkif.hpp"
+#include "net/arp.hpp"
 #include "common/utils.h"
 #include "net/sockbuf.hpp"
 #include "arch/asm.h"
+#include "otrix/immediate_console.hpp"
 
 namespace otrix::net
 {
 
-ipv4::ipv4(linkif *link, ipv4_t addr): link_(link), addr_(addr)
+ipv4::ipv4(linkif *link, arp *arp, ipv4_t addr, ipv4_t gateway): link_(link), arp_(arp), addr_(addr), gateway_(gateway)
 {
     link_->subscribe_to_rx(ethertype::ipv4, [] (sockbuf *data, void *ctx) {
                 ipv4 *p_this = (ipv4 *)ctx;
@@ -15,23 +17,15 @@ ipv4::ipv4(linkif *link, ipv4_t addr): link_(link), addr_(addr)
             }, this);
 }
 
-struct ip_hdr {
-    uint8_t version_ihl;
-    uint8_t tos;
-    uint16_t len;
-    uint16_t id;
-    uint16_t flags_offset;
-    uint8_t ttl;
-    uint8_t proto;
-    uint16_t csum;
-    uint32_t saddr;
-    uint32_t daddr;
-} __attribute__((packed));
-
 static constexpr uint8_t VERSION_IHL_IPV4 = (4 << 4) | (sizeof(ip_hdr) / sizeof(uint32_t));
 
 kerror_t ipv4::write(sockbuf *data, ipv4_t dest, ipproto_t proto, uint64_t timeout_ms)
 {
+    mac_t destination;
+    if (!arp_->resolve(gateway_, &destination, timeout_ms)) {
+        return E_UNREACHABLE;
+    }
+
     ip_hdr *hdr = reinterpret_cast<ip_hdr *>(data->add_header(sizeof(ip_hdr), sockbuf_header_t::ip));
     hdr->version_ihl = VERSION_IHL_IPV4;
     hdr->tos = 0;
@@ -44,16 +38,10 @@ kerror_t ipv4::write(sockbuf *data, ipv4_t dest, ipproto_t proto, uint64_t timeo
     hdr->saddr = htonl(addr_);
     hdr->daddr = htonl(dest);
 
-    const uint16_t *hdr_start = reinterpret_cast<uint16_t *>(hdr);
-    uint32_t csum = 0;
-    for (size_t i = 0; i < sizeof(ip_hdr) / sizeof(uint16_t); i++) {
-        csum += *hdr_start;
-        hdr_start++;
-    }
-    const uint16_t csum_computed = ~((csum & 0xffff) + ((csum & 0xffff0000) >> 16));
+    const uint16_t csum_computed = ip_checksum((const uint8_t *)hdr, sizeof(ip_hdr));
 
-    hdr->csum = htons(csum_computed);
-    const mac_t destination = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+    hdr->csum = csum_computed;
+    immediate_console::print("Sending packet of type %d to %08x\n", proto, dest);
     return link_->write(data, destination, ethertype::ipv4, timeout_ms);
 }
 
@@ -86,14 +74,7 @@ void ipv4::process_packet(sockbuf *data)
     data->add_parsed_header(sizeof(ip_hdr), sockbuf_header_t::ip);
     const ip_hdr *p_hdr = (ip_hdr *)data->header(sockbuf_header_t::ip);
 
-    uint32_t csum = 0;
-    const uint16_t *hdr_start = reinterpret_cast<const uint16_t *>(p_hdr);
-    for (size_t i = 0; i < sizeof(ip_hdr) / sizeof(uint16_t); i++) {
-        csum += *hdr_start;
-        hdr_start++;
-    }
-
-    const uint16_t csum_computed = ~((csum & 0xffff) + ((csum & 0xffff0000) >> 16));
+    const uint16_t csum_computed = ip_checksum((const uint8_t *)p_hdr, sizeof(ip_hdr));
     if (csum_computed != 0) {
         return;
     }
@@ -110,6 +91,8 @@ void ipv4::process_packet(sockbuf *data)
 
     const size_t len = ntohs(p_hdr->len) - sizeof(ip_hdr);
     data->set_payload_size(len);
+
+    immediate_console::print("Got IPv4 packet of type %d\n", p_hdr->proto);
 
     for (const auto handler : rx_handlers_) {
         if (std::get<0>(handler) == (ipproto_t)p_hdr->proto) {

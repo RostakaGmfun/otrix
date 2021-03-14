@@ -12,7 +12,7 @@ add_library(otrix_kernel kmain.cpp kthread.cpp waitq.cpp semaphore.cpp msgq.cpp)
 target_link_libraries(otrix_kernel otrix_arch otrix_kmem)
 target_include_directories(otrix_kernel PUBLIC include)
 
-add_executable(otrix otrix.cpp newlib_stubs.c cpp_stubs.cpp)
+add_executable(otrix otrix.cpp newlib_stubs.cpp cpp_stubs.cpp)
 target_link_libraries(otrix otrix_kernel otrix_dev otrix_net)
 
 install(TARGETS otrix RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

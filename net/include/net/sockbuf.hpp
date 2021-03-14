@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstring>
+#include <cstdint>
+#include <cstddef>
 #include "kernel/alloc.hpp"
 
 namespace otrix::net
@@ -12,6 +14,7 @@ enum class sockbuf_header_t
     virtio,
     ethernet,
     ip,
+    icmp,
     udp,
     tcp,
 
@@ -58,7 +61,23 @@ public:
         }
     }
 
-    sockbuf(const sockbuf &other);
+    sockbuf(const sockbuf &other)
+    {
+        buffer_size_ = other.payload_ - other.head_ + other.payload_size_;
+        start_ = (uint8_t *)otrix::alloc(buffer_size_);
+        head_ = start_;
+        payload_ = start_ + (other.payload_ - other.head_);
+        payload_size_ = other.payload_size_;
+        free_func_ = nullptr;
+        free_func_ctx_ = nullptr;
+
+        memcpy(start_, other.head_, buffer_size_);
+
+        for (int i = 0; i < (int)sockbuf_header_t::max; i++) {
+            headers_[i] = start_ + (other.headers_[i] - other.start_);
+        }
+    }
+
     sockbuf& operator=(const sockbuf &other);
 
     sockbuf(sockbuf &&other);
@@ -76,14 +95,19 @@ public:
 
     size_t size() const
     {
-        return buffer_size_;
+        return (payload_ - head_) + payload_size_;
     }
 
     uint8_t *add_header(size_t header_size, sockbuf_header_t type)
     {
-        if ((size_t)(head_ - start_) < header_size || nullptr != headers_[(int)type]) {
+        if ((size_t)(head_ - start_) < header_size) {
             return nullptr;
         }
+
+        if (nullptr != headers_[(int)type]) {
+            return headers_[(int)type];
+        }
+
         head_ -= header_size;
         headers_[(int)type] = head_;
         return head_;
@@ -113,7 +137,12 @@ public:
         return headers_[(int)type];
     }
 
-    const void *payload() const
+    uint8_t *header(sockbuf_header_t type)
+    {
+        return headers_[(int)type];
+    }
+
+    const uint8_t *payload() const
     {
         return payload_;
     }

@@ -15,6 +15,8 @@ public:
 
     static void print(const char *format, ...);
 
+    static void write(const void *buf, size_t count);
+
 private:
     static bool inited_;
     static constexpr size_t buffer_size_ = 2048;

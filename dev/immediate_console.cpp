@@ -46,4 +46,11 @@ void immediate_console::print(const char *format, ...)
     arch_irq_restore(flags);
 }
 
+void immediate_console::write(const void *buf, size_t count)
+{
+    auto flags = arch_irq_save();
+    serial_write(&immediate_com_port, (const uint8_t *)buf, count);
+    arch_irq_restore(flags);
+}
+
 } // namespace otrix

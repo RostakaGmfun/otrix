@@ -166,17 +166,12 @@ static inline struct intrusive_list *intrusive_list_insert(struct intrusive_list
 {
     kASSERT(prev != NULL && node != NULL);
 
-    struct intrusive_list *tmp = node->next;
     node->next = prev->next;
     if (node->next != NULL) {
         node->next->prev = node;
     }
     node->prev = prev;
     prev->next = node;
-    node->next = tmp;
-    if (tmp != NULL) {
-        tmp->prev = node;
-    }
 
     return node;
 }

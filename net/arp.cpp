@@ -56,6 +56,23 @@ bool arp::get_mac(ipv4_t addr, mac_t *p_mac)
     return false;
 }
 
+kerror_t arp::announce()
+{
+    mac_t target = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    return send_reply(ip_addr_, target, make_ipv4(255, 255, 255, 255));
+}
+
+bool arp::resolve(ipv4_t addr, mac_t *p_mac, uint64_t timeout_ms)
+{
+    if (get_mac(addr, p_mac)) {
+        return true;
+    }
+
+    // TODO: send request and wait for reply with timeout
+    (void)timeout_ms;
+    return false;
+}
+
 void arp::process_packet(sockbuf *data)
 {
     if (data->payload_size() < sizeof(arp_header_ipv4)) {
@@ -83,21 +100,30 @@ void arp::process_packet(sockbuf *data)
         memcpy(table_[0].second, p_arp->sender_mac, sizeof(table_[0].second));
     }
 }
-
-kerror_t arp::announce()
+kerror_t arp::send_reply(ipv4_t addr, const mac_t &target_mac, ipv4_t target_ip)
 {
-    mac_t target = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    return send_reply(ip_addr_, target, make_ipv4(255, 255, 255, 255));
+    return send(ARP_REPLY, addr, target_mac, target_ip);
 }
 
-kerror_t arp::send_reply(ipv4_t addr, const mac_t &target_mac, ipv4_t target_ip)
+kerror_t arp::send_request(ipv4_t target_ip)
+{
+    mac_t target_mac = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    return send(ARP_REQUEST, ip_addr_, target_mac, target_ip);
+}
+
+kerror_t arp::send_request(ipv4_t addr, const mac_t &target_mac, ipv4_t target_ip)
+{
+    return send(ARP_REQUEST, addr, target_mac, target_ip);
+}
+
+kerror_t arp::send(uint16_t op, ipv4_t addr, const mac_t &target_mac, ipv4_t target_ip)
 {
     arp_header_ipv4 payload;
     payload.hardware_type = htons(1); // ethernet
     payload.protocol_type = htons((uint16_t)ethertype::ipv4);
     payload.hln = sizeof(mac_t);
     payload.pln = sizeof(ipv4_t);
-    payload.operation = htons(ARP_REPLY);
+    payload.operation = htons(op);
     linkif_->get_mac(&payload.sender_mac);
     payload.sender_ip = htonl(addr);
     memcpy(payload.target_mac, target_mac, sizeof(target_mac));
@@ -105,6 +131,5 @@ kerror_t arp::send_reply(ipv4_t addr, const mac_t &target_mac, ipv4_t target_ip)
     sockbuf packet(linkif_->headers_size(), (uint8_t *)&payload, sizeof(payload));
     return linkif_->write(&packet, payload.target_mac, ethertype::arp, -1);
 }
-
 
 } // namespace otrix::net

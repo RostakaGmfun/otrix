@@ -8,6 +8,7 @@ typedef enum
     E_NOMEM,
     E_INVAL,
     E_TOUT,
+    E_UNREACHABLE,
 } kerror_t;
 
 #endif // OTRIX_ERROR_H

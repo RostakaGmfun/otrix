@@ -1,8 +1,15 @@
 #include "common/assert.h"
+#include "otrix/immediate_console.hpp"
 
-int write()
+extern "C" {
+
+int write(int fd, const char *buf, int count)
 {
-    kASSERT(0);
+    if (fd == 1 || fd == 2) {
+        otrix::immediate_console::write(buf, count);
+        return count;
+    }
+    return -1;
 }
 
 int read()
@@ -27,12 +34,12 @@ int lseek()
 
 int fstat()
 {
-    kASSERT(0);
+    return 0;
 }
 
 int sbrk()
 {
-    kASSERT(0);
+    return 0;
 }
 
 int kill()
@@ -49,4 +56,6 @@ void _exit(int arg)
 int getpid()
 {
     kASSERT(0);
+}
+
 }
