@@ -1,5 +1,4 @@
-#ifndef OTRIX_INTRUSIVE_LIST_H
-#define OTRIX_INTRUSIVE_LIST_H
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -221,5 +220,3 @@ static inline struct intrusive_list *intrusive_list_insert_sorted(struct intrusi
 #ifdef __cplusplus
 }
 #endif
-
-#endif // OTRIX_INTRUSIVE_LIST_H

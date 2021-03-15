@@ -7,6 +7,7 @@
 #include "net/sockbuf.hpp"
 #include "net/arp.hpp"
 #include "net/icmp.hpp"
+#include "net/tcp.hpp"
 
 namespace otrix::net {
 
@@ -20,6 +21,7 @@ static void net_task_entry(void *arg)
     net::arp arp_layer(&net, address);
     net::ipv4 ip_layer(&net, &arp_layer, address, gateway);
     net::icmp icmp_layer(&ip_layer);
+    net::tcp tcp_layer(&ip_layer);
     arp_layer.announce();
     arp_layer.send_request(gateway);
     while (1) {

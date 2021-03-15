@@ -40,9 +40,9 @@ static inline ipv4_t make_ipv4(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
     return a << 24 | b << 16 | c << 8 | d;
 }
 
-static inline uint16_t ip_checksum(const uint8_t *p_data, size_t data_size)
+static inline uint16_t ip_checksum(const uint8_t *p_data, size_t data_size, uint32_t initial_sum = 0)
 {
-    uint32_t csum = 0;
+    uint32_t csum = initial_sum;
     const uint16_t *hdr_start = reinterpret_cast<const uint16_t *>(p_data);
     for (size_t i = 0; i < data_size / sizeof(uint16_t); i++) {
         csum += *hdr_start;
