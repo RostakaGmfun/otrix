@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "common/error.h"
 
 #include "net/ipv4.hpp"
 
@@ -21,11 +22,15 @@ enum socket_type
 class socket
 {
 public:
+    virtual ~socket() {}
+
     virtual size_t send(const void *data, size_t data_size) = 0;
     virtual size_t recv(void *data, size_t data_size) = 0;
+    virtual kerror_t connect(ipv4_t remote_addr, ipv4_t remote_port) = 0;
     virtual kerror_t bind(uint16_t port) = 0;
-    virtual kerror_t listen(int backlog_size) = 0;
-    virtual socket *accept() = 0;
+    virtual kerror_t listen(size_t backlog_size) = 0;
+    virtual socket *accept(uint64_t timeout_ms = -1) = 0;
+    virtual kerror_t shutdown() = 0;
 
     ipv4_t get_remote_addr() const
     {

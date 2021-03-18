@@ -1,32 +1,12 @@
 #include "net/tcp.hpp"
 #include <functional>
-#include "net/sockbuf.hpp"
 #include "common/utils.h"
-
-#define TCP_CONG_WND_REDUCED (1 << 7)
-#define TCP_ECN_ECHO         (1 << 6)
-#define TCP_URG              (1 << 5)
-#define TCP_ACK              (1 << 4)
-#define TCP_PSH              (1 << 3)
-#define TCP_RST              (1 << 2)
-#define TCP_SYN              (1 << 1)
-#define TCP_FIN              (1 << 0)
+#include "net/sockbuf.hpp"
+#include "net/tcp_socket.hpp"
+#include "otrix/immediate_console.hpp"
 
 namespace otrix::net
 {
-
-struct tcp_header
-{
-    uint16_t source_port;
-    uint16_t dest_port;
-    uint32_t seq;
-    uint32_t ack;
-    uint8_t header_len;
-    uint8_t flags;
-    uint16_t window_size;
-    uint16_t csum;
-    uint16_t urp;
-} __attribute__((packed));
 
 struct ipv4_pseudo_header
 {
@@ -44,8 +24,8 @@ static size_t tcp_header_size(const sockbuf *buf)
 }
 
 tcp::tcp(ipv4 *ip_layer): ip_layer_(ip_layer),
-                          listen_sockets_(TCP_LISTEN_TABLE_SIZE, socket_id_hash_func),
-                          connected_sockets_(TCP_CONNECTED_TABLE_SIZE, socket_id_hash_func)
+                          listen_sockets_(TCP_LISTEN_TABLE_SIZE, [] (const socket_id &key) -> size_t { return key.host_port; }),
+                          connected_sockets_(TCP_CONNECTED_TABLE_SIZE, socket_id::hash_func)
 {
     ip_layer_->subscribe_to_rx(ipproto_t::tcp, [] (sockbuf *data, void *ctx) {
                 tcp *p_this = (tcp *)ctx;
@@ -55,31 +35,7 @@ tcp::tcp(ipv4 *ip_layer): ip_layer_(ip_layer),
 
 socket *tcp::create_socket()
 {
-    return nullptr;
-}
-
-void tcp::process_packet(sockbuf *data)
-{
-    data->add_parsed_header(tcp_header_size(data), sockbuf_header_t::tcp);
-    const tcp_header *p_hdr = (tcp_header *)data->header(sockbuf_header_t::tcp);
-    hash_map_node<socket_id> *hm_node = nullptr;
-    if (p_hdr->flags & TCP_SYN) {
-        // Handle incoming connection request
-        socket_id id{ntohs(p_hdr->dest_port), 0, 0};
-        hm_node = listen_sockets_.find(id);
-    } else {
-        const ip_hdr *p_ip_hdr = (ip_hdr *)data->header(sockbuf_header_t::ip);
-        // Handle active connection, if any
-        socket_id id{ntohs(p_hdr->dest_port), ntohs(p_hdr->source_port), ntohl(p_ip_hdr->saddr)};
-        hm_node = connected_sockets_.find(id);
-    }
-
-    if (nullptr == hm_node) {
-        send_rst_reply(data);
-    } else {
-        tcp_socket *sock = container_of(hm_node, tcp_socket::node_t, hm_node)->p_socket;
-        sock->process_packet(data);
-    }
+    return new tcp_socket(this);
 }
 
 uint16_t tcp::tcp_checksum(const sockbuf *buf, ipv4_t dest_address_network_order)
@@ -100,34 +56,92 @@ uint16_t tcp::tcp_checksum(const sockbuf *buf, ipv4_t dest_address_network_order
             sizeof(tcp_header) + buf->payload_size(), initial_csum);
 }
 
-void tcp::send_rst_reply(sockbuf *data)
+kerror_t tcp::bind_socket(tcp_socket *sock, uint16_t port)
 {
-    const tcp_header *p_in_hdr = (tcp_header *)data->header(sockbuf_header_t::tcp);
+    socket_id id{port, 0, 0};
+    auto hm_node = listen_sockets_.find(id);
+    if (nullptr != hm_node) {
+        return E_ADDRINUSE;
+    }
+
+    sock->node()->hm_node.key = id;
+
+    listen_sockets_.insert(&sock->node()->hm_node);
+
+    return E_OK;
+}
+
+kerror_t tcp::unbind_socket(tcp_socket *sock)
+{
+    listen_sockets_.remove(&sock->node()->hm_node);
+    return E_OK;
+}
+
+kerror_t tcp::add_connected_socket(tcp_socket *sock, socket_id id)
+{
+    auto hm_node = listen_sockets_.find(id);
+    if (nullptr != hm_node) {
+        return E_ADDRINUSE;
+    }
+
+    sock->node()->hm_node.key = id;
+
+    connected_sockets_.insert(&sock->node()->hm_node);
+
+    return E_OK;
+}
+
+kerror_t tcp::remove_connected_socket(tcp_socket *sock)
+{
+    connected_sockets_.remove(&sock->node()->hm_node);
+    return E_OK;
+}
+
+void tcp::process_packet(sockbuf *data)
+{
+    data->add_parsed_header(tcp_header_size(data), sockbuf_header_t::tcp);
+    const tcp_header *p_hdr = (tcp_header *)data->header(sockbuf_header_t::tcp);
+    hash_map_node<socket_id> *hm_node = nullptr;
     const ip_hdr *p_ip_hdr = (ip_hdr *)data->header(sockbuf_header_t::ip);
+    socket_id connected_id{ntohs(p_hdr->dest_port), ntohs(p_hdr->source_port), ntohl(p_ip_hdr->saddr)};
+    auto connected_node = connected_sockets_.find(connected_id);
+    if (p_hdr->flags & TCP_FLAG_SYN || nullptr == connected_node) {
+        // Handle incoming connection request
+        socket_id listen_id{ntohs(p_hdr->dest_port), 0, 0};
+        hm_node = listen_sockets_.find(listen_id);
+    } else {
+        // Handle active connection, if any
+        hm_node = connected_node;
+    }
+
+    if (nullptr == hm_node) {
+        send_reply(data, TCP_FLAG_RST | TCP_FLAG_ACK);
+    } else {
+        tcp_socket *sock = container_of(hm_node, tcp_socket::node_t, hm_node)->p_socket;
+        sock->process_packet(data);
+    }
+}
+
+kerror_t tcp::send_reply(const sockbuf *reply_to, uint8_t tcp_flags)
+{
+    const tcp_header *p_in_hdr = (tcp_header *)reply_to->header(sockbuf_header_t::tcp);
+    const ip_hdr *p_ip_hdr = (ip_hdr *)reply_to->header(sockbuf_header_t::ip);
 
     sockbuf reply(ip_layer_->headers_size() + sizeof(tcp_header), nullptr, 0);
     tcp_header *p_tcp_hdr = (tcp_header *)reply.add_header(sizeof(tcp_header), sockbuf_header_t::tcp);
     p_tcp_hdr->source_port = p_in_hdr->dest_port;
     p_tcp_hdr->dest_port = p_in_hdr->source_port;
-    p_tcp_hdr->seq = p_in_hdr->flags & TCP_ACK ? p_in_hdr->ack : 0;
-    p_tcp_hdr->ack = htonl(ntohl(p_in_hdr->seq) + data->payload_size() + 1);
+    p_tcp_hdr->seq = p_in_hdr->flags & TCP_FLAG_ACK ? p_in_hdr->ack : 0;
+    p_tcp_hdr->ack = htonl(ntohl(p_in_hdr->seq) + reply_to->payload_size() + 1);
     p_tcp_hdr->header_len = (sizeof(tcp_header) / sizeof(uint32_t)) << 4;
-    p_tcp_hdr->flags = TCP_RST | TCP_ACK;
+    p_tcp_hdr->flags = tcp_flags;
     p_tcp_hdr->window_size = 0;
     p_tcp_hdr->csum = 0;
     p_tcp_hdr->urp = 0;
 
     const uint16_t csum = tcp_checksum(&reply, p_ip_hdr->saddr);
     p_tcp_hdr->csum = csum;
-    ip_layer_->write(&reply, ntohl(p_ip_hdr->saddr), ipproto_t::tcp, -1);
-}
-
-size_t tcp::socket_id_hash_func(const tcp::socket_id &key)
-{
-    size_t ret = std::hash<uint16_t>{}(key.host_port);
-    ret ^= std::hash<uint16_t>{}(key.remote_port) + 0x9e3779b9 + (ret<<6) + (ret>>2);
-    ret ^= std::hash<uint32_t>{}(key.remote_ip) + 0x9e3779b9 + (ret<<6) + (ret>>2);
-    return ret;
+    return ip_layer_->write(&reply, ntohl(p_ip_hdr->saddr), ipproto_t::tcp, -1);
 }
 
 } // namespace otrix::net

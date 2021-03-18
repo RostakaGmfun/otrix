@@ -1,4 +1,6 @@
 #include "net/net_task.hpp"
+#include <memory>
+
 #include "kernel/kthread.hpp"
 #include "dev/pci.hpp"
 #include "dev/virtio_net.hpp"
@@ -8,8 +10,40 @@
 #include "net/arp.hpp"
 #include "net/icmp.hpp"
 #include "net/tcp.hpp"
+#include "net/socket.hpp"
 
 namespace otrix::net {
+
+static void tcp_server(tcp *p_tcp, uint16_t port)
+{
+    std::shared_ptr<socket> srv = std::shared_ptr<socket>(p_tcp->create_socket());
+    if (nullptr == srv) {
+        immediate_console::print("Failed to create socket\n");
+        return;
+    }
+
+    kerror_t ret = srv->bind(port);
+    if (E_OK != ret) {
+        immediate_console::print("Failed to bind socket to %d, err %d\n", port, ret);
+        return;
+    }
+
+    ret = srv->listen(10);
+    if (E_OK != ret) {
+        immediate_console::print("Failed to listen on port %d, err %d\n", port, ret);
+        return;
+    }
+
+    immediate_console::print("Listening for incoming connections on port %d\n", port);
+
+    while (true) {
+        socket *client = srv->accept();
+        immediate_console::print("Accepted connection from %p %08x:%d\n", client, client->get_remote_addr(), client->get_remote_port());
+        const char *msg = "Hello\r\n";
+        client->send(msg, strlen(msg));
+        client->shutdown();
+    }
+}
 
 static void net_task_entry(void *arg)
 {
@@ -24,9 +58,10 @@ static void net_task_entry(void *arg)
     net::tcp tcp_layer(&ip_layer);
     arp_layer.announce();
     arp_layer.send_request(gateway);
-    while (1) {
-        scheduler::get().sleep(1000);
-    }
+
+    tcp_server(&tcp_layer, 80);
+
+    scheduler::get().sleep(-1);
 }
 
 void net_task_start(otrix::dev::pci_dev *net_dev)

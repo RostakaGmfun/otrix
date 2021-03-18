@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 #add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-unwind-tables -std=c++17 -fno-rtti>)
 
-add_compile_options(-fno-tree-vectorize -Wall -Wextra -Werror -Wno-unused-function -Wno-address-of-packed-member -ggdb3 -O0)
+add_compile_options(-fno-tree-vectorize -Wall -Wextra -Werror
+  -Wno-unused-function -Wno-address-of-packed-member -Wno-error=unused-parameter -ggdb3 -O0)
 
 option(BUILD_HOST_TESTS "Build host tests instead of kernel" OFF)
 
