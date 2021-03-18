@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/hash_map.hpp"
-#include "common/error.hpp"
+#include "common/error.h"
 #include "net/ipv4.hpp"
 #include <functional>
 
