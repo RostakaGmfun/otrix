@@ -26,6 +26,7 @@ kthread::kthread(const char *name, int priority):
 
 kthread::~kthread()
 {
+    // TODO: join thread
     scheduler::get().remove_thread(this);
     delete [] stack_;
 }
@@ -117,6 +118,16 @@ kerror_t scheduler::schedule()
 
 kerror_t scheduler::sleep(uint64_t block_time_ms)
 {
+    if (static_cast<uint64_t>(-1) == block_time_ms) {
+        return sleep_until(-1);
+    } else {
+        const uint64_t tsc_deadline = arch_tsc() + arch::kvmclock::ns_to_tsc(block_time_ms * 1000 * 1000);
+        return sleep_until(tsc_deadline);
+    }
+}
+
+kerror_t scheduler::sleep_until(uint64_t tsc_deadline)
+{
     auto flags = arch_irq_save();
 
     kthread *thread = KTHREAD_PTR(current_thread_);
@@ -125,11 +136,10 @@ kerror_t scheduler::sleep(uint64_t block_time_ms)
 
     remove_thread(thread);
     thread->node()->state = KTHREAD_STATE_BLOCKED;
-    if (static_cast<uint64_t>(-1) == block_time_ms) {
+    if (static_cast<uint64_t>(-1) == tsc_deadline) {
         thread->node()->tsc_deadline = -1;
         blocked_queues_[priority] = intrusive_list_push_back(blocked_queues_[priority], &thread->node()->list_node);
     } else {
-        const uint64_t tsc_deadline = arch_tsc() + arch::kvmclock::ns_to_tsc(block_time_ms * 1000 * 1000);
         thread->node()->tsc_deadline = tsc_deadline;
         nearest_tsc_deadline_ = std::min(nearest_tsc_deadline_, tsc_deadline);
         if (nullptr != blocked_queues_[priority]) {
@@ -139,10 +149,6 @@ kerror_t scheduler::sleep(uint64_t block_time_ms)
                     {
                         return KTHREAD_NODE_PTR(a)->tsc_deadline > KTHREAD_NODE_PTR(b)->tsc_deadline;
                     });
-            intrusive_list *t = blocked_queues_[priority];
-            do {
-                t = t->next;
-            } while (t != blocked_queues_[priority]);
         } else {
             blocked_queues_[priority] = intrusive_list_push_back(blocked_queues_[priority], &thread->node()->list_node);
         }

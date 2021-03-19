@@ -20,7 +20,7 @@ namespace otrix
 using kthread_entry = void(*)(void *);
 
 enum kthread_state {
-    KTHREAD_STATE_ZOMBIE,  /**< Not present int any of the thread queues **/
+    KTHREAD_STATE_ZOMBIE,  /**< Not present in any of the thread queues **/
     KTHREAD_STATE_ACTIVE,  /**< Current thread **/
     KTHREAD_STATE_RUNNABLE,/**< In the runnable queue **/
     KTHREAD_STATE_BLOCKED, /**< Blocked **/
@@ -108,6 +108,8 @@ public:
      * Move current thread to blocked queue (inifinte or with timeout).
      */
     kerror_t sleep(uint64_t sleep_time_ms);
+
+    kerror_t sleep_until(uint64_t tsc_deadline);
 
     /**
      * Move thread from blocked queue to run queue.

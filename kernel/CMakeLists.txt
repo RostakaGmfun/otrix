@@ -8,7 +8,7 @@ target_include_directories(kmem_test PUBLIC include)
 target_link_libraries(kmem_test unity otrix_kmem)
 add_test(NAME kmem_test COMMAND kmem_test)
 else()
-add_library(otrix_kernel kmain.cpp kthread.cpp waitq.cpp semaphore.cpp msgq.cpp)
+add_library(otrix_kernel kmain.cpp kthread.cpp waitq.cpp semaphore.cpp msgq.cpp mutex.cpp timer_service.cpp)
 target_link_libraries(otrix_kernel otrix_arch otrix_kmem)
 target_include_directories(otrix_kernel PUBLIC include)
 
