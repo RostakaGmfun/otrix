@@ -73,6 +73,11 @@ private:
 
     void handle_listen_state(const sockbuf *data);
 
+
+    kerror_t send_syn_ack(const sockbuf *reply_to, uint32_t isn);
+
+    uint32_t generate_isn();
+
     static constexpr auto INVALID_PORT = 0xFFFFFFFF;
 
     node_t node_;
@@ -80,6 +85,8 @@ private:
     uint32_t port_;
     tcp_state state_;
     msgq *listen_backlog_;
+    uint32_t seq_;
+    uint32_t ack_;
 
     struct syn_cache_entry
     {
@@ -87,11 +94,11 @@ private:
         uint32_t remote_isn; // SEQ value received in SYN
     };
 
-    using syncache_t = pooled_hash_map<tcp::socket_id, syn_cache_entry>;
-
     static constexpr auto SYN_CACHE_TABLE_SIZE = 17;
     // socket_id -> syn_cache_entry
     pooled_hash_map<tcp::socket_id, syn_cache_entry> *syn_cache_;
+
+    static constexpr auto TCP_INITIAL_WINDOW_SIZE = 1024;
 };
 
 } // otrix::net

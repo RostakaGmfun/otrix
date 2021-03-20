@@ -74,8 +74,12 @@ public:
     kerror_t bind_socket(tcp_socket *sock, uint16_t port);
     kerror_t unbind_socket(tcp_socket *sock);
     kerror_t send_reply(const sockbuf *reply_to, uint8_t flags);
+    kerror_t send(ipv4_t remote_addr, sockbuf *buf);
     kerror_t add_connected_socket(tcp_socket *sock, socket_id id);
     kerror_t remove_connected_socket(tcp_socket *sock);
+
+
+    size_t headers_size() const;
 
 private:
 

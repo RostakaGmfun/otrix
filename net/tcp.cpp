@@ -144,4 +144,17 @@ kerror_t tcp::send_reply(const sockbuf *reply_to, uint8_t tcp_flags)
     return ip_layer_->write(reply, ntohl(p_ip_hdr->saddr), ipproto_t::tcp, -1);
 }
 
+kerror_t tcp::send(ipv4_t remote_addr, sockbuf *buf)
+{
+    tcp_header *p_tcp_hdr = (tcp_header *)buf->header(sockbuf_header_t::tcp);
+    const uint16_t csum = tcp_checksum(buf, htonl(remote_addr));
+    p_tcp_hdr->csum = csum;
+    return ip_layer_->write(buf, remote_addr, ipproto_t::tcp, -1);
+}
+
+size_t tcp::headers_size() const
+{
+    return ip_layer_->headers_size() + sizeof(tcp_header);
+}
+
 } // namespace otrix::net

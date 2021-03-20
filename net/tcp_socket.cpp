@@ -1,10 +1,12 @@
 #include "net/tcp_socket.hpp"
+
+#include <climits>
 #include "net/tcp.hpp"
 #include "net/socket.hpp"
 #include "net/sockbuf.hpp"
 #include "kernel/msgq.hpp"
 #include "common/utils.h"
-
+#include "arch/asm.h"
 #include "otrix/immediate_console.hpp"
 
 namespace otrix::net
@@ -12,7 +14,8 @@ namespace otrix::net
 
 tcp_socket::tcp_socket(tcp *tcp_layer): node_(this), tcp_layer_(tcp_layer),
                                         port_(INVALID_PORT), state_(TCP_STATE_CLOSED),
-                                        listen_backlog_(nullptr), syn_cache_(nullptr)
+                                        listen_backlog_(nullptr), seq_(0), ack_(0),
+                                        syn_cache_(nullptr)
 {
 
 }
@@ -122,6 +125,26 @@ kerror_t tcp_socket::accept_connection(const sockbuf *data)
     return listen_backlog_->write(&new_conn) ? E_OK : E_NOMEM;
 }
 
+kerror_t tcp_socket::send_syn_ack(const sockbuf *reply_to, uint32_t isn)
+{
+    const tcp_header *p_in_hdr = (tcp_header *)reply_to->header(sockbuf_header_t::tcp);
+    const ip_hdr *p_ip_hdr = (ip_hdr *)reply_to->header(sockbuf_header_t::ip);
+
+    sockbuf *reply = new sockbuf(tcp_layer_->headers_size(), nullptr, 0);
+    tcp_header *p_tcp_hdr = (tcp_header *)reply->add_header(sizeof(tcp_header), sockbuf_header_t::tcp);
+    p_tcp_hdr->source_port = p_in_hdr->dest_port;
+    p_tcp_hdr->dest_port = p_in_hdr->source_port;
+    p_tcp_hdr->seq = htonl(isn);
+    p_tcp_hdr->ack = htonl(ntohl(p_in_hdr->seq) + reply_to->payload_size() + 1);
+    p_tcp_hdr->header_len = (sizeof(tcp_header) / sizeof(uint32_t)) << 4;
+    p_tcp_hdr->flags = TCP_FLAG_SYN | TCP_FLAG_ACK;
+    p_tcp_hdr->window_size = ntohs(TCP_INITIAL_WINDOW_SIZE);
+    p_tcp_hdr->csum = 0;
+    p_tcp_hdr->urp = 0;
+
+    return tcp_layer_->send(ntohl(p_ip_hdr->saddr), reply);
+}
+
 kerror_t tcp_socket::handle_syn(const sockbuf *data)
 {
     const ip_hdr *p_ip_hdr = (ip_hdr *)data->header(sockbuf_header_t::ip);
@@ -134,12 +157,14 @@ kerror_t tcp_socket::handle_syn(const sockbuf *data)
         return E_INVAL;
     }
 
-    if (nullptr == syn_cache_->insert(id, syn_cache_entry{0, 0})) {
+    const uint32_t isn = generate_isn();
+
+    if (nullptr == syn_cache_->insert(id, syn_cache_entry{isn, ntohl(p_tcp_hdr->seq)})) {
         return E_NOMEM;
     }
 
     // TODO: retransmit on timer and delete syncache entry on timeout
-    return tcp_layer_->send_reply(data, TCP_FLAG_SYN | TCP_FLAG_ACK);
+    return send_syn_ack(data, isn);
 }
 
 void tcp_socket::handle_listen_state(const sockbuf *data)
@@ -153,6 +178,11 @@ void tcp_socket::handle_listen_state(const sockbuf *data)
     } else {
         tcp_layer_->send_reply(data, TCP_FLAG_RST | TCP_FLAG_ACK);
     }
+}
+
+uint32_t tcp_socket::generate_isn()
+{
+    return arch_tsc() % UINT32_MAX;
 }
 
 } // otrix::net
