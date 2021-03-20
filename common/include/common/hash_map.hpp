@@ -127,15 +127,20 @@ public:
         return p_entry;
     }
 
+    void remove(hash_map_node<K> *node)
+    {
+        hash_map<K>::remove(node);
+        if ((void *)node >= (void *)pool_ && (void *)node < (void *)(pool_ + pool_size_)) {
+            // Only add those nodes that belong to the pool
+            pool_head_ = intrusive_list_push_back(pool_head_, &node->list_node);
+        }
+    }
+
     void remove(const K &key)
     {
         hash_map_node<K> *node = hash_map<K>::find(key);
         if (nullptr != node) {
-            hash_map<K>::remove(node);
-            if ((void *)node >= (void *)pool_ && (void *)node < (void *)(pool_ + pool_size_)) {
-                // Only add those nodes that belong to the pool
-                pool_head_ = intrusive_list_push_back(pool_head_, &node->list_node);
-            }
+            remove(node);
         }
     }
 

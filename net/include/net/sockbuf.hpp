@@ -63,23 +63,6 @@ public:
         }
     }
 
-    sockbuf(const sockbuf &other)
-    {
-        buffer_size_ = other.payload_ - other.head_ + other.payload_size_;
-        start_ = (uint8_t *)otrix::alloc(buffer_size_);
-        head_ = start_;
-        payload_ = start_ + (other.payload_ - other.head_);
-        payload_size_ = other.payload_size_;
-        free_func_ = nullptr;
-        free_func_ctx_ = nullptr;
-
-        memcpy(start_, other.head_, buffer_size_);
-
-        for (int i = 0; i < (int)sockbuf_header_t::max; i++) {
-            headers_[i] = start_ + (other.headers_[i] - other.start_);
-        }
-    }
-
     sockbuf& operator=(const sockbuf &other);
 
     sockbuf(sockbuf &&other);

@@ -17,6 +17,12 @@ tcp_socket::tcp_socket(tcp *tcp_layer): node_(this), tcp_layer_(tcp_layer),
 
 }
 
+tcp_socket::~tcp_socket()
+{
+    tcp_layer_->unbind_socket(this);
+    tcp_layer_->remove_connected_socket(this);
+}
+
 size_t tcp_socket::send(const void *data, size_t data_size)
 {
     (void)data;
@@ -96,7 +102,12 @@ kerror_t tcp_socket::accept_connection(const sockbuf *data)
     const ip_hdr *p_ip_hdr = (ip_hdr *)data->header(sockbuf_header_t::ip);
     const tcp_header *p_tcp_hdr = (tcp_header *)data->header(sockbuf_header_t::tcp);
     tcp::socket_id id{(uint16_t)port_, ntohs(p_tcp_hdr->source_port), ntohl(p_ip_hdr->saddr)};
-    syn_cache_->remove(id);
+    auto node = syn_cache_->find(id);
+    if (nullptr == node) {
+        tcp_layer_->send_reply(data, TCP_FLAG_ACK | TCP_FLAG_RST);
+        return E_OK;
+    }
+    syn_cache_->remove(node);
     if (listen_backlog_->full())
     {
         return E_NOMEM;

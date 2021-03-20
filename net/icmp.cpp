@@ -41,25 +41,25 @@ bool icmp::ping(ipv4_t addr, uint64_t timeout)
     static int req_id = 1; // TODO: add random
     ping_req_id_ = req_id++;
     ping_req_pending_ = true;
-    sockbuf request(ip_->headers_size() + sizeof(icmp_v4_hdr), nullptr, sizeof(icmp_echo_hdr) + ICMP_PAYLOAD_SIZE);
-    icmp_echo_hdr *echo_cmd = (icmp_echo_hdr *)request.payload();
+    sockbuf *request = new sockbuf(ip_->headers_size() + sizeof(icmp_v4_hdr), nullptr, sizeof(icmp_echo_hdr) + ICMP_PAYLOAD_SIZE);
+    icmp_echo_hdr *echo_cmd = (icmp_echo_hdr *)request->payload();
     echo_cmd->id_seq = ping_req_id_;
     for (int i = 0; i < ICMP_PAYLOAD_SIZE; i++) {
         echo_cmd->data[i] = i;
     }
 
-    request.add_header(sizeof(icmp_v4_hdr), sockbuf_header_t::icmp);
-    icmp_v4_hdr *p_request_hdr = (icmp_v4_hdr *)request.header(sockbuf_header_t::icmp);
+    request->add_header(sizeof(icmp_v4_hdr), sockbuf_header_t::icmp);
+    icmp_v4_hdr *p_request_hdr = (icmp_v4_hdr *)request->header(sockbuf_header_t::icmp);
     p_request_hdr->type = icmp_type::echo;
     p_request_hdr->csum = 0;
     p_request_hdr->code = 0;
 
-    const size_t csum_size = sizeof(icmp_v4_hdr) + request.payload_size();
+    const size_t csum_size = sizeof(icmp_v4_hdr) + request->payload_size();
     const uint16_t csum_computed = ip_checksum((uint8_t *)p_request_hdr, csum_size);
     p_request_hdr->csum = csum_computed;
 
     // TODO: decrease timeout when multiple blocking operations are issues
-    ip_->write(&request, addr, ipproto_t::icmp, timeout);
+    ip_->write(request, addr, ipproto_t::icmp, timeout);
 
     const bool ret = ping_req_semaphore_.take(timeout);
     ping_req_pending_ = false;
@@ -90,17 +90,17 @@ void icmp::process_echo_request(sockbuf *data)
 {
     const ip_hdr *p_ip_hdr = (const ip_hdr *)data->header(sockbuf_header_t::ip);
 
-    sockbuf reply(ip_->headers_size() + sizeof(icmp_v4_hdr), data->payload(), data->payload_size());
-    reply.add_header(sizeof(icmp_v4_hdr), sockbuf_header_t::icmp);
-    icmp_v4_hdr *p_reply_hdr = (icmp_v4_hdr *)reply.header(sockbuf_header_t::icmp);
+    sockbuf *reply = new sockbuf(ip_->headers_size() + sizeof(icmp_v4_hdr), data->payload(), data->payload_size());
+    reply->add_header(sizeof(icmp_v4_hdr), sockbuf_header_t::icmp);
+    icmp_v4_hdr *p_reply_hdr = (icmp_v4_hdr *)reply->header(sockbuf_header_t::icmp);
     p_reply_hdr->type = icmp_type::echo_reply;
     p_reply_hdr->csum = 0;
     p_reply_hdr->code = 0;
-    const size_t csum_size = sizeof(icmp_v4_hdr) + reply.payload_size();
+    const size_t csum_size = sizeof(icmp_v4_hdr) + reply->payload_size();
     const uint16_t csum_computed = ip_checksum((uint8_t *)p_reply_hdr, csum_size);
     p_reply_hdr->csum = csum_computed;
 
-    ip_->write(&reply, ntohl(p_ip_hdr->saddr), ipproto_t::icmp, -1);
+    ip_->write(reply, ntohl(p_ip_hdr->saddr), ipproto_t::icmp, -1);
 }
 
 void icmp::process_echo_reply(sockbuf *data)

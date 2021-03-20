@@ -102,8 +102,11 @@ void virtio_net::get_mac(net::mac_t *mac)
 
 kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethertype type, uint64_t timeout_ms)
 {
+    // TODO: add timeout for virtq_send_buffer
+    (void)timeout_ms;
     using namespace net;
-    ethernet_hdr *e_hdr = reinterpret_cast<ethernet_hdr *>(data->add_header(sizeof(ethernet_hdr), sockbuf_header_t::ethernet));
+    ethernet_hdr *e_hdr = reinterpret_cast<ethernet_hdr *>(data->add_header(sizeof(ethernet_hdr),
+                    sockbuf_header_t::ethernet));
     memcpy(&e_hdr->dmac, &dest, sizeof(dest));
     get_mac(&e_hdr->smac);
     if (net::ethertype::unknown == type) {
@@ -111,17 +114,18 @@ kerror_t virtio_net::write(net::sockbuf *data, const net::mac_t &dest, net::ethe
     } else {
         e_hdr->ethertype = htons(static_cast<uint16_t>(type));
     }
-    virtio_net_hdr *v_hdr = reinterpret_cast<virtio_net_hdr *>(data->add_header(sizeof(virtio_net_hdr), sockbuf_header_t::virtio));
+    virtio_net_hdr *v_hdr = reinterpret_cast<virtio_net_hdr *>(data->add_header(sizeof(virtio_net_hdr),
+                    sockbuf_header_t::virtio));
     memset(v_hdr, 0, sizeof(*v_hdr));
 
     kerror_t ret = virtq_send_buffer(tx_q_, data->data(), data->size(), false);
     if (E_OK != ret) {
         return ret;
     }
-    return tx_complete_.take(timeout_ms) ? E_OK : E_TOUT;
+    return E_OK;
 }
 
-kerror_t virtio_net::subscribe_to_rx(net::ethertype type, net::l2_handler_t p_handler, void *ctx)
+kerror_t virtio_net::subscribe_to_rx(net::ethertype type, net::l3_handler_t p_handler, void *ctx)
 {
     auto flags = arch_irq_save();
     for (int i = 0; i < MAX_RX_HANDLERS; i++) {
@@ -190,16 +194,18 @@ void virtio_net::write_reg(uint16_t reg, uint32_t value)
     }
 }
 
-void virtio_net::tx_completion_event(void *ctx, void *data, size_t size)
+void virtio_net::tx_completion_event(void *ctx, void *data_ctx, void *data, size_t size)
 {
     (void)data;
     (void)size;
-    virtio_net *p_this = (virtio_net *)ctx;
-    p_this->tx_complete_.give();
+    (void)ctx;
+    net::sockbuf *owner = (net::sockbuf *)data_ctx;
+    delete owner;
 }
 
-void virtio_net::rx_handler(void *ctx, void *data, size_t size)
+void virtio_net::rx_handler(void *ctx, void *data_ctx, void *data, size_t size)
 {
+    (void)data_ctx;
     virtio_net *p_this = (virtio_net *)ctx;
     if (p_this->rx_packet_queue_.full()) {
         return;

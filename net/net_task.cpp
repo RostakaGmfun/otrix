@@ -42,6 +42,7 @@ static void tcp_server(tcp *p_tcp, uint16_t port)
         const char *msg = "Hello\r\n";
         client->send(msg, strlen(msg));
         client->shutdown();
+        delete client;
     }
 }
 

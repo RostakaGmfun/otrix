@@ -127,8 +127,8 @@ kerror_t tcp::send_reply(const sockbuf *reply_to, uint8_t tcp_flags)
     const tcp_header *p_in_hdr = (tcp_header *)reply_to->header(sockbuf_header_t::tcp);
     const ip_hdr *p_ip_hdr = (ip_hdr *)reply_to->header(sockbuf_header_t::ip);
 
-    sockbuf reply(ip_layer_->headers_size() + sizeof(tcp_header), nullptr, 0);
-    tcp_header *p_tcp_hdr = (tcp_header *)reply.add_header(sizeof(tcp_header), sockbuf_header_t::tcp);
+    sockbuf *reply = new sockbuf(ip_layer_->headers_size() + sizeof(tcp_header), nullptr, 0);
+    tcp_header *p_tcp_hdr = (tcp_header *)reply->add_header(sizeof(tcp_header), sockbuf_header_t::tcp);
     p_tcp_hdr->source_port = p_in_hdr->dest_port;
     p_tcp_hdr->dest_port = p_in_hdr->source_port;
     p_tcp_hdr->seq = p_in_hdr->flags & TCP_FLAG_ACK ? p_in_hdr->ack : 0;
@@ -139,9 +139,9 @@ kerror_t tcp::send_reply(const sockbuf *reply_to, uint8_t tcp_flags)
     p_tcp_hdr->csum = 0;
     p_tcp_hdr->urp = 0;
 
-    const uint16_t csum = tcp_checksum(&reply, p_ip_hdr->saddr);
+    const uint16_t csum = tcp_checksum(reply, p_ip_hdr->saddr);
     p_tcp_hdr->csum = csum;
-    return ip_layer_->write(&reply, ntohl(p_ip_hdr->saddr), ipproto_t::tcp, -1);
+    return ip_layer_->write(reply, ntohl(p_ip_hdr->saddr), ipproto_t::tcp, -1);
 }
 
 } // namespace otrix::net

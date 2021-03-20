@@ -128,8 +128,8 @@ kerror_t arp::send(uint16_t op, ipv4_t addr, const mac_t &target_mac, ipv4_t tar
     payload.sender_ip = htonl(addr);
     memcpy(payload.target_mac, target_mac, sizeof(target_mac));
     payload.target_ip = htonl(target_ip);
-    sockbuf packet(linkif_->headers_size(), (uint8_t *)&payload, sizeof(payload));
-    return linkif_->write(&packet, payload.target_mac, ethertype::arp, -1);
+    sockbuf *packet = new sockbuf(linkif_->headers_size(), (uint8_t *)&payload, sizeof(payload));
+    return linkif_->write(packet, payload.target_mac, ethertype::arp, -1);
 }
 
 } // namespace otrix::net

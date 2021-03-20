@@ -33,6 +33,7 @@ enum tcp_state
 class tcp_socket: public socket {
 public:
     tcp_socket(tcp *tcp_layer);
+    ~tcp_socket() override;
 
     size_t send(const void *data, size_t data_size) override;
     size_t recv(void *data, size_t data_size) override;
@@ -85,6 +86,8 @@ private:
         uint32_t isn; // ACK value sent in SYN+ACK
         uint32_t remote_isn; // SEQ value received in SYN
     };
+
+    using syncache_t = pooled_hash_map<tcp::socket_id, syn_cache_entry>;
 
     static constexpr auto SYN_CACHE_TABLE_SIZE = 17;
     // socket_id -> syn_cache_entry

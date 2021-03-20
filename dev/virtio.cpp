@@ -139,7 +139,8 @@ kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, vq_irq_ha
         return (in + 4095) & ~4095;
     };
 
-    const size_t virtq_size = vq_align(descriptor_table_size + available_ring_size) + vq_align(used_ring_size);
+    const size_t virtq_size = vq_align(descriptor_table_size + available_ring_size) + vq_align(used_ring_size) +
+                              sizeof(void *) * queue_len;
 
     virtq *p_vq = (virtq *)otrix::alloc(sizeof(virtq));
     if (nullptr == p_vq) {
@@ -161,11 +162,15 @@ kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, vq_irq_ha
     }
     memset(p_vq->allocated_mem, 0, alloc_size);
 
-    p_vq->desc_table = reinterpret_cast<virtio_descriptor *>(vq_align((uintptr_t)p_vq->allocated_mem));
+    p_vq->desc_table =
+        reinterpret_cast<virtio_descriptor *>(vq_align((uintptr_t)p_vq->allocated_mem));
     p_vq->avail_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table + descriptor_table_size);
     p_vq->avail_ring = (uint16_t *)((uint8_t *)p_vq->avail_ring_hdr + sizeof(virtio_ring_hdr));
-    p_vq->used_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table + vq_align(descriptor_table_size + available_ring_size));
-    p_vq->used_ring = (virtio_used_elem *)((uint8_t *)p_vq->used_ring_hdr + sizeof(virtio_ring_hdr));
+    p_vq->used_ring_hdr = (virtio_ring_hdr *)((uint8_t *)p_vq->desc_table +
+                vq_align(descriptor_table_size + available_ring_size));
+    p_vq->used_ring =
+        (virtio_used_elem *)((uint8_t *)p_vq->used_ring_hdr + sizeof(virtio_ring_hdr));
+    p_vq->desc_ctx = (void **)((uint8_t *)p_vq->used_ring_hdr + vq_align(used_ring_size));
 
     for (int i = 0; i < p_vq->size - 1; i++) {
         p_vq->desc_table[i].next = i + 1;
@@ -182,7 +187,8 @@ kerror_t virtio_dev::virtq_create(uint16_t index, virtq **p_out_virtq, vq_irq_ha
         write_reg(queue_msix_vector, msix_vector);
     }
 
-    immediate_console::print("Created VQ%d @ %p, msix %04x\n", p_vq->index, p_vq->desc_table, read_reg(queue_msix_vector));
+    immediate_console::print("Created VQ%d @ %p, msix %04x\n", p_vq->index, p_vq->desc_table,
+            read_reg(queue_msix_vector));
 
     return E_OK;
 }
@@ -202,7 +208,8 @@ kerror_t virtio_dev::virtq_destroy(virtq *p_vq)
     return E_OK;
 }
 
-kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size, bool device_writable)
+kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buffer_size,
+        bool device_writable, void *buf_ctx)
 {
     if (nullptr == p_vq || nullptr == p_buffer || 0 == buffer_size) {
         return E_INVAL;
@@ -217,6 +224,7 @@ kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buf
     p_vq->free_list = p_vq->desc_table[idx].next;
     arch_irq_restore(flags);
 
+    p_vq->desc_ctx[idx] = buf_ctx;
     p_vq->num_free_descriptors--;
     volatile virtio_descriptor *p_desc = &p_vq->desc_table[idx];
     p_desc->addr = (uint64_t)p_buffer;
@@ -224,12 +232,14 @@ kerror_t virtio_dev::virtq_send_buffer(virtq *p_vq, void *p_buffer, uint32_t buf
     p_desc->flags = device_writable ? VIRTQ_DESC_F_WRITE : 0;
     p_desc->next = 0;
 
+    flags = arch_irq_save();
     p_vq->avail_ring[p_vq->avail_ring_hdr->idx % p_vq->size] = idx;
     const int avail_index = p_vq->avail_ring_hdr->idx + 1;
 
     // Memory barrier to make sure all changes are visible to the device when index is updated
     __sync_synchronize();
     p_vq->avail_ring_hdr->idx = avail_index;
+    arch_irq_restore(flags);
 
     if (!(p_vq->used_ring_hdr->flags & VIRTQ_USED_F_NO_NOTIFY)) {
         write_reg(queue_notify, p_vq->index);
@@ -255,7 +265,8 @@ void virtio_dev::handle_vq_irq(void *ctx)
         const int desc_id = p_vq->used_ring[p_vq->used_idx % p_vq->size].id;
         volatile virtio_descriptor *p_desc = &p_vq->desc_table[desc_id];
         if (nullptr != p_vq->irq_handler) {
-            p_vq->irq_handler(p_vq->irq_handler_ctx, reinterpret_cast<void *>(p_desc->addr), p_desc->len);
+            p_vq->irq_handler(p_vq->irq_handler_ctx, p_vq->desc_ctx[desc_id],
+                    reinterpret_cast<void *>(p_desc->addr), p_desc->len);
         }
         p_desc->next = p_vq->free_list;
         p_vq->free_list = desc_id;
