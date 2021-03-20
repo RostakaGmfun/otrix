@@ -87,10 +87,12 @@ void timer_service::run()
         while (1) {
             mutex_.lock();
             if (nullptr == pending_tasks_) {
+                mutex_.unlock();
                 break;
             }
             if (TASK_PTR(pending_tasks_)->deadline_tsc > arch_tsc()) {
                 next_tsc_deadline = TASK_PTR(pending_tasks_)->deadline_tsc;
+                mutex_.unlock();
                 break;
             }
             auto task = TASK_PTR(pending_tasks_);
