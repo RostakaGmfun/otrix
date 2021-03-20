@@ -113,6 +113,11 @@ public:
         delete [] pool_;
     }
 
+    static entry_t *to_entry(hash_map_node<K> *node)
+    {
+        return container_of(node, entry_t, hm_node);
+    }
+
     entry_t *insert(const K &key, V &&value)
     {
         if (nullptr == pool_head_) {

@@ -153,8 +153,14 @@ kerror_t tcp_socket::handle_syn(const sockbuf *data)
 
     auto syn_entry = syn_cache_->find(id);
     if (nullptr != syn_entry) {
-        // TODO handle SYN retransmission from client
-        return E_INVAL;
+        // SYN (likely) retransmitted
+        // Check incoming seq number and send SYN+ACK again
+        auto *entry = syn_cache_->to_entry(syn_entry);
+        if (ntohl(p_tcp_hdr->seq) == entry->value.remote_isn) {
+            return send_syn_ack(data, entry->value.isn);
+        } else {
+            tcp_layer_->send_reply(data, TCP_FLAG_ACK | TCP_FLAG_RST);
+        }
     }
 
     const uint32_t isn = generate_isn();
