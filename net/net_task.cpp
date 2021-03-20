@@ -36,14 +36,14 @@ static void tcp_server(tcp *p_tcp, uint16_t port)
 
     immediate_console::print("Listening for incoming connections on port %d\n", port);
 
+    socket *client = srv->accept();
+    immediate_console::print("Accepted connection from %p %08x:%d\n", client, client->get_remote_addr(), client->get_remote_port());
     while (true) {
-        socket *client = srv->accept();
-        immediate_console::print("Accepted connection from %p %08x:%d\n", client, client->get_remote_addr(), client->get_remote_port());
-        const char *msg = "Hello\r\n";
-        client->send(msg, strlen(msg));
-        client->shutdown();
-        delete client;
+        char buf[16];
+        size_t ret = client->recv(buf, sizeof(buf));
+        immediate_console::print("RECV: %.*s\n", ret, buf);
     }
+    delete client;
 }
 
 static void net_task_entry(void *arg)

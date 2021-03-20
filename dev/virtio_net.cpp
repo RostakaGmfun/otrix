@@ -49,8 +49,9 @@ struct virtio_net_hdr
 
 using otrix::immediate_console;
 
-virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev), rx_packet_queue_(16, sizeof(net::sockbuf *)),
-                                        rx_thread_(64 * 1024, [] (void *ctx) { ((virtio_net *)ctx)->rx_thread(); }, "virtio_net-RX", 3, this)
+virtio_net::virtio_net(pci_dev *p_dev): virtio_dev(p_dev), rx_packet_queue_(RX_QUEUE_SIZE, sizeof(net::sockbuf *)),
+                                        rx_thread_(64 * 1024, [] (void *ctx) { ((virtio_net *)ctx)->rx_thread(); }, "virtio_net-RX", 3, this),
+                                        num_rx_buffers_(0)
 {
     begin_init();
 
@@ -213,10 +214,20 @@ void virtio_net::rx_handler(void *ctx, void *data_ctx, void *data, size_t size)
     const auto skb_free_func = [] (void *buf, size_t size, void *ctx) {
         // Return buffer to the rx queue
         virtio_net *p_this = (virtio_net *)ctx;
-        p_this->virtq_send_buffer(p_this->rx_q_, buf, size, true);
+        auto flags = arch_irq_save();
+        const bool free_needed = p_this->num_rx_buffers_ > RX_QUEUE_SIZE;
+        if (free_needed) {
+            otrix::free(buf);
+        }
+        arch_irq_restore(flags);
+        if (!free_needed) {
+            p_this->virtq_send_buffer(p_this->rx_q_, buf, size, true);
+            p_this->num_rx_buffers_++;
+        }
     };
     // Create zero-copy socket buffer
     // TODO: get rid of memory allocation in IRQ handler
+    p_this->num_rx_buffers_--;
     net::sockbuf *skb = new net::sockbuf((uint8_t *)data, size, skb_free_func, p_this);
     if (nullptr == skb) {
         return;
@@ -236,6 +247,9 @@ void virtio_net::rx_thread()
         void *buf = otrix::alloc(MTU + sizeof(virtio_net_hdr));
         // TODO: destroy thread and free buffers in virtio_net desctructor
         virtq_send_buffer(rx_q_, buf, MTU + sizeof(virtio_net_hdr), true);
+        auto flags = arch_irq_save();
+        num_rx_buffers_++;
+        arch_irq_restore(flags);
     }
     while (1) {
         sockbuf *skb = nullptr;
@@ -258,6 +272,15 @@ void virtio_net::rx_thread()
         }
 
         delete skb;
+
+        // Allocate additional buffers to keep RX populated
+        auto flags = arch_irq_save();
+        while (num_rx_buffers_ < RX_QUEUE_SIZE) {
+            void *buf = otrix::alloc(MTU + sizeof(virtio_net_hdr));
+            virtq_send_buffer(rx_q_, buf, MTU + sizeof(virtio_net_hdr), true);
+            num_rx_buffers_++;
+        }
+        arch_irq_restore(flags);
     }
 }
 

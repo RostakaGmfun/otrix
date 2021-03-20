@@ -3,6 +3,7 @@
 #include "net/socket.hpp"
 #include "net/tcp.hpp"
 #include "common/hash_map.hpp"
+#include "kernel/waitq.hpp"
 
 namespace otrix
 {
@@ -68,25 +69,19 @@ public:
 
 private:
 
-    kerror_t accept_connection(const sockbuf *data);
+    kerror_t accept_connection(sockbuf *data);
     kerror_t handle_syn(const sockbuf *data);
+    kerror_t handle_segment(sockbuf *data);
 
-    void handle_listen_state(const sockbuf *data);
-
+    void handle_listen_state(sockbuf *data);
+    void handle_established_state(sockbuf *data);
 
     kerror_t send_syn_ack(const sockbuf *reply_to, uint32_t isn);
+    kerror_t send_packet(uint8_t flags);
 
     uint32_t generate_isn();
 
     static constexpr auto INVALID_PORT = 0xFFFFFFFF;
-
-    node_t node_;
-    tcp *tcp_layer_;
-    uint32_t port_;
-    tcp_state state_;
-    msgq *listen_backlog_;
-    uint32_t seq_;
-    uint32_t ack_;
 
     struct syn_cache_entry
     {
@@ -98,7 +93,21 @@ private:
     // socket_id -> syn_cache_entry
     pooled_hash_map<tcp::socket_id, syn_cache_entry> *syn_cache_;
 
-    static constexpr auto TCP_INITIAL_WINDOW_SIZE = 1024;
+    node_t node_;
+    tcp *tcp_layer_;
+    uint32_t port_;
+    tcp_state state_;
+    msgq *listen_backlog_;
+    uint32_t seq_;
+    uint32_t ack_;
+    size_t recv_window_size_;
+    size_t recv_window_used_;
+    intrusive_list *recv_skb_; // List of sockbuf with application payload
+    size_t recv_skb_payload_offset_; // Offset into the first sockbuf from recv_skb_ list
+    waitq recv_waitq_;
+
+    static constexpr auto TCP_MSS = 1460;
+    static constexpr auto TCP_INITIAL_WINDOW_SIZE = TCP_MSS * 20;
 };
 
 } // otrix::net

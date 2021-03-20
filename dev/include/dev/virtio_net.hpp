@@ -64,8 +64,11 @@ private:
     static constexpr auto MAX_RX_HANDLERS = 2;
     std::tuple<net::ethertype, net::l3_handler_t, void *> rx_handlers_[MAX_RX_HANDLERS];
 
+    static constexpr auto RX_QUEUE_SIZE = 16;
+
     msgq rx_packet_queue_;
     kthread rx_thread_;
+    size_t num_rx_buffers_; // Number of buffers sent to the RX queue
     net::mac_t addr_;
 
     static constexpr auto MTU = 1514;
