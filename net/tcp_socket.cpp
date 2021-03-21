@@ -170,7 +170,7 @@ kerror_t tcp_socket::handle_syn(const sockbuf *data)
         if (ntohl(p_tcp_hdr->seq) == entry->value.remote_isn) {
             return send_syn_ack(data, entry->value.isn);
         } else {
-            tcp_layer_->send_reply(data, TCP_FLAG_ACK | TCP_FLAG_RST);
+            return tcp_layer_->send_reply(data, TCP_FLAG_ACK | TCP_FLAG_RST);
         }
     }
 
