@@ -48,9 +48,16 @@ size_t tcp_socket::recv(void *data, size_t data_size)
         recv_skb_payload_offset_ += to_copy;
         recv_window_used_ -= to_copy;
         if (recv_skb_payload_offset_ == buf->payload_size()) {
+            const tcp_header *p_tcp_hdr = (tcp_header *)buf->header(sockbuf_header_t::tcp);
+            const bool push_received = p_tcp_hdr->flags & TCP_FLAG_PSH;
             recv_skb_ = intrusive_list_delete(recv_skb_, recv_skb_);
             recv_skb_payload_offset_ = 0;
             delete buf;
+            if (push_received) {
+                // Push received, return data to the application immediately
+                arch_irq_restore(flags);
+                break;
+            }
         }
         arch_irq_restore(flags);
     }
@@ -209,6 +216,7 @@ kerror_t tcp_socket::handle_segment(sockbuf *data)
         recv_skb_ = intrusive_list_push_back(recv_skb_, &sk_copy->node()->list_node);
         recv_waitq_.notify_one();
     }
+    // TODO: implement smarter ACKing algorithm
     return send_packet(TCP_FLAG_ACK);
 }
 
