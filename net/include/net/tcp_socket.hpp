@@ -4,6 +4,7 @@
 #include "net/tcp.hpp"
 #include "common/hash_map.hpp"
 #include "kernel/waitq.hpp"
+#include "kernel/mutex.hpp"
 
 namespace otrix
 {
@@ -78,6 +79,7 @@ private:
 
     kerror_t send_syn_ack(const sockbuf *reply_to, uint32_t isn);
     kerror_t send_packet(uint8_t flags);
+    kerror_t send_segment(sockbuf *data, bool is_last);
 
     uint32_t generate_isn();
 
@@ -105,6 +107,11 @@ private:
     intrusive_list *recv_skb_; // List of sockbuf with application payload
     size_t recv_skb_payload_offset_; // Offset into the first sockbuf from recv_skb_ list
     waitq recv_waitq_;
+    mutex recv_mutex_; // Held by recv() to guarantee that the caller receives contiguous data
+
+    size_t remote_window_size_;
+    waitq send_waitq_; // Waited on when remote window is full
+    mutex send_mutex_; // Held by send() to guarantee that the caller sends contiguous data
 
     static constexpr auto TCP_MSS = 1460;
     static constexpr auto TCP_INITIAL_WINDOW_SIZE = TCP_MSS * 20;

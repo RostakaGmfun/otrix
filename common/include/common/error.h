@@ -11,6 +11,7 @@ typedef enum
     E_UNREACHABLE,
     E_NOIMPL,
     E_ADDRINUSE,
+    E_PIPE,
 } kerror_t;
 
 #endif // OTRIX_ERROR_H

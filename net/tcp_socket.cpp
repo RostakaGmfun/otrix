@@ -28,39 +28,70 @@ tcp_socket::~tcp_socket()
 
 size_t tcp_socket::send(const void *data, size_t data_size)
 {
-    (void)data;
-    (void)data_size;
-    return E_NOIMPL;
+    send_mutex_.lock();
+    size_t sent = 0;
+    while (sent != data_size) {
+        const size_t to_send = std::min(data_size - sent, (size_t)TCP_MSS);
+        sockbuf *buf = new sockbuf(tcp_layer_->headers_size(), (uint8_t *)data + sent, to_send);
+        const bool is_last_segment = ((sent + to_send) == data_size);
+        const kerror_t ret = send_segment(buf, is_last_segment);
+        if (E_PIPE == ret) {
+            sent = 0;
+            break;
+        } else if (E_OK != ret) {
+            break;
+        }
+        sent += to_send;
+    }
+    send_mutex_.unlock();
+    return sent;
 }
 
 size_t tcp_socket::recv(void *data, size_t data_size)
 {
+    // TODO: lock guards would be nice to have for mutexes and arch_irq_save/restore stuff
+    recv_mutex_.lock();
+
     size_t received = 0;
     while (received != data_size) {
+        bool push_received = false;
+
+        // True if window was zero before data was read,
+        // which means we need to send ACK with updated window size ASAP
+        bool window_was_zero = false;
+
         if (nullptr == recv_skb_) {
             recv_waitq_.wait();
         }
         auto flags = arch_irq_save();
         sockbuf *buf = container_of(recv_skb_, sockbuf::node_t, list_node)->p_skb;
-        const size_t to_copy = std::min(data_size - received, buf->payload_size() - recv_skb_payload_offset_);
+        const size_t to_copy = std::min(data_size - received,
+                buf->payload_size() - recv_skb_payload_offset_);
         memcpy((char *)data + received, buf->payload() + recv_skb_payload_offset_, to_copy);
         received += to_copy;
         recv_skb_payload_offset_ += to_copy;
+        if (recv_window_used_ == recv_window_size_) {
+            window_was_zero = true;
+        }
         recv_window_used_ -= to_copy;
         if (recv_skb_payload_offset_ == buf->payload_size()) {
             const tcp_header *p_tcp_hdr = (tcp_header *)buf->header(sockbuf_header_t::tcp);
-            const bool push_received = p_tcp_hdr->flags & TCP_FLAG_PSH;
+            push_received = p_tcp_hdr->flags & TCP_FLAG_PSH;
+
             recv_skb_ = intrusive_list_delete(recv_skb_, recv_skb_);
             recv_skb_payload_offset_ = 0;
             delete buf;
-            if (push_received) {
-                // Push received, return data to the application immediately
-                arch_irq_restore(flags);
-                break;
-            }
         }
         arch_irq_restore(flags);
+        if (window_was_zero) {
+            send_packet(TCP_FLAG_ACK);
+        }
+        if (push_received) {
+            // Push received, return data to the application immediately
+            break;
+        }
     }
+    recv_mutex_.unlock();
     return received;
 }
 
@@ -138,11 +169,16 @@ kerror_t tcp_socket::accept_connection(sockbuf *data)
         tcp_layer_->send_reply(data, TCP_FLAG_ACK | TCP_FLAG_RST);
         return E_OK;
     }
+    auto *entry = syn_cache_->to_entry(node);
+    if (ntohl(p_tcp_hdr->seq) != (entry->value.remote_isn + 1) || ntohl(p_tcp_hdr->ack) != (entry->value.isn + 1)) {
+        return tcp_layer_->send_reply(data, TCP_FLAG_ACK | TCP_FLAG_RST);
+    }
     if (listen_backlog_->full())
     {
         return E_NOMEM;
     }
 
+    const uint32_t seq = entry->value.isn + 1;
     syn_cache_->remove(node);
     // TODO: overload constructor for connected socket
     tcp_socket *new_conn = new tcp_socket(tcp_layer_);
@@ -151,7 +187,7 @@ kerror_t tcp_socket::accept_connection(sockbuf *data)
     new_conn->node_.hm_node.key = id;
     new_conn->remote_addr_ = ntohl(p_ip_hdr->saddr);
     new_conn->remote_port_ = ntohs(p_tcp_hdr->source_port);
-    new_conn->seq_ = ntohl(p_tcp_hdr->ack); // TODO: verify this
+    new_conn->seq_ = seq;
     new_conn->ack_ = ntohl(p_tcp_hdr->seq);
     new_conn->recv_window_size_ = TCP_INITIAL_WINDOW_SIZE;
     new_conn->recv_window_used_ = data->payload_size();
@@ -200,8 +236,10 @@ kerror_t tcp_socket::handle_segment(sockbuf *data)
         return send_packet(TCP_FLAG_ACK);
 
     }
+    auto flags = arch_irq_save();
     if (recv_window_size_ - recv_window_used_ < data->payload_size()) {
         // Window is full, ignore
+        arch_irq_restore(flags);
         return E_NOMEM;
     }
     recv_window_used_ += data->payload_size();
@@ -211,13 +249,24 @@ kerror_t tcp_socket::handle_segment(sockbuf *data)
         // Move underlying buffer ownership from incoming skb to internal copy
         // which will be freed when application
         // reads data from the payload.
-        // TODO: Use copy semantics for smaller payloads
+        // TODO: Use copy semantics for smaller payloads to avoid holding
+        // MTU-sized buffer in recv list
         sockbuf *sk_copy = new sockbuf(std::move(*data));
         recv_skb_ = intrusive_list_push_back(recv_skb_, &sk_copy->node()->list_node);
         recv_waitq_.notify_one();
     }
-    // TODO: implement smarter ACKing algorithm
-    return send_packet(TCP_FLAG_ACK);
+    const size_t old_remote_window_size = remote_window_size_;
+    remote_window_size_ = ntohs(p_in_hdr->window_size);
+    if (ntohs(p_in_hdr->window_size) > old_remote_window_size) {
+        // Notify other thread (if any), that the remote window size has increased
+        send_waitq_.notify_one();
+    }
+    arch_irq_restore(flags);
+
+    if (p_in_hdr->flags & TCP_FLAG_PSH || recv_window_size_ == 0) {
+        return send_packet(TCP_FLAG_ACK);
+    }
+    return E_OK;
 }
 
 void tcp_socket::handle_listen_state(sockbuf *data)
@@ -278,6 +327,30 @@ kerror_t tcp_socket::send_packet(uint8_t flags)
     p_tcp_hdr->urp = 0;
 
     return tcp_layer_->send(get_remote_addr(), reply);
+}
+
+kerror_t tcp_socket::send_segment(sockbuf *data, bool is_last)
+{
+    auto flags = arch_irq_save();
+    while (remote_window_size_ < data->payload_size()) {
+        send_waitq_.wait();
+    }
+    seq_ += data->payload_size();
+    remote_window_size_ -= data->payload_size();
+    arch_irq_restore(flags);
+
+    tcp_header *p_tcp_hdr = (tcp_header *)data->add_header(sizeof(tcp_header), sockbuf_header_t::tcp);
+    p_tcp_hdr->source_port = htons(port_);
+    p_tcp_hdr->dest_port = htons(get_remote_port());
+    p_tcp_hdr->seq = htonl(seq_ - data->payload_size());
+    p_tcp_hdr->ack = htonl(ack_);
+    p_tcp_hdr->header_len = (sizeof(tcp_header) / sizeof(uint32_t)) << 4;
+    p_tcp_hdr->flags = TCP_FLAG_ACK | (is_last ? TCP_FLAG_PSH : 0);
+    p_tcp_hdr->window_size = htons(recv_window_size_ - recv_window_used_);
+    p_tcp_hdr->csum = 0;
+    p_tcp_hdr->urp = 0;
+
+    return tcp_layer_->send(get_remote_addr(), data);
 }
 
 uint32_t tcp_socket::generate_isn()
