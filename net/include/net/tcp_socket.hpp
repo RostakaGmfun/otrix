@@ -44,7 +44,7 @@ public:
     kerror_t bind(uint16_t port) override;
     kerror_t listen(size_t backlog_size) override;
     socket *accept(uint64_t timeout_ms = -1) override;
-    kerror_t shutdown() override;
+    kerror_t shutdown(bool read, bool write) override;
 
     struct node_t {
         node_t(tcp_socket *sock): p_socket(sock)
@@ -76,6 +76,7 @@ private:
 
     void handle_listen_state(sockbuf *data);
     void handle_established_state(sockbuf *data);
+    void handle_close_wait_state(sockbuf *data);
 
     kerror_t send_syn_ack(const sockbuf *reply_to, uint32_t isn);
     kerror_t send_packet(uint8_t flags);

@@ -30,7 +30,7 @@ public:
     virtual kerror_t bind(uint16_t port) = 0;
     virtual kerror_t listen(size_t backlog_size) = 0;
     virtual socket *accept(uint64_t timeout_ms = -1) = 0;
-    virtual kerror_t shutdown() = 0;
+    virtual kerror_t shutdown(bool read, bool write) = 0;
 
     ipv4_t get_remote_addr() const
     {

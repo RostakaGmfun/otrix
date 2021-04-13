@@ -7,6 +7,7 @@
 #include "kernel/msgq.hpp"
 #include "common/utils.h"
 #include "arch/asm.h"
+#include "otrix/immediate_console.hpp"
 
 namespace otrix::net
 {
@@ -22,6 +23,7 @@ tcp_socket::tcp_socket(tcp *tcp_layer): syn_cache_(nullptr), node_(this), tcp_la
 
 tcp_socket::~tcp_socket()
 {
+    shutdown(true, true);
     tcp_layer_->unbind_socket(this);
     tcp_layer_->remove_connected_socket(this);
 }
@@ -52,6 +54,11 @@ size_t tcp_socket::recv(void *data, size_t data_size)
     // TODO: lock guards would be nice to have for mutexes and arch_irq_save/restore stuff
     recv_mutex_.lock();
 
+    if (TCP_STATE_ESTABLISHED != state_ && TCP_STATE_SYN_SENT != state_
+            && TCP_STATE_SYN_RECEIVED != state_) {
+        return 0;
+    }
+
     size_t received = 0;
     while (received != data_size) {
         bool push_received = false;
@@ -76,7 +83,7 @@ size_t tcp_socket::recv(void *data, size_t data_size)
         recv_window_used_ -= to_copy;
         if (recv_skb_payload_offset_ == buf->payload_size()) {
             const tcp_header *p_tcp_hdr = (tcp_header *)buf->header(sockbuf_header_t::tcp);
-            push_received = p_tcp_hdr->flags & TCP_FLAG_PSH;
+            push_received = p_tcp_hdr->flags & (TCP_FLAG_PSH | TCP_FLAG_FIN);
 
             recv_skb_ = intrusive_list_delete(recv_skb_, recv_skb_);
             recv_skb_payload_offset_ = 0;
@@ -139,9 +146,9 @@ socket *tcp_socket::accept(uint64_t timeout_ms)
     return accepted_socket;
 }
 
-kerror_t tcp_socket::shutdown()
+kerror_t tcp_socket::shutdown(bool read, bool write)
 {
-    return E_NOIMPL;
+    return E_OK;
 }
 
 void tcp_socket::process_packet(sockbuf *data)
@@ -152,6 +159,9 @@ void tcp_socket::process_packet(sockbuf *data)
         break;
     case TCP_STATE_ESTABLISHED:
         handle_established_state(data);
+        break;
+    case TCP_STATE_CLOSE_WAIT:
+        handle_close_wait_state(data);
         break;
     default:
         break;
@@ -237,14 +247,29 @@ kerror_t tcp_socket::handle_segment(sockbuf *data)
 
     }
     auto flags = arch_irq_save();
+
     if (recv_window_size_ - recv_window_used_ < data->payload_size()) {
-        // Window is full, ignore
+        // Window is full
         arch_irq_restore(flags);
-        return E_NOMEM;
+        return send_packet(TCP_FLAG_ACK);
     }
     recv_window_used_ += data->payload_size();
     ack_ += data->payload_size();
-    if (data->payload_size() > 0) {
+
+    const bool is_fin = p_in_hdr->flags & TCP_FLAG_FIN;
+    if (is_fin) {
+        immediate_console::print("FIN received\r\n");
+        state_ = TCP_STATE_CLOSE_WAIT;
+    }
+
+    const size_t old_remote_window_size = remote_window_size_;
+    remote_window_size_ = ntohs(p_in_hdr->window_size);
+    if (ntohs(p_in_hdr->window_size) > old_remote_window_size) {
+        // Notify other thread (if any), that the remote window size has increased
+        send_waitq_.notify_one();
+    }
+
+    if (data->payload_size() > 0 || is_fin) {
         // Zero-copy receive in action:
         // Move underlying buffer ownership from incoming skb to internal copy
         // which will be freed when application
@@ -255,15 +280,9 @@ kerror_t tcp_socket::handle_segment(sockbuf *data)
         recv_skb_ = intrusive_list_push_back(recv_skb_, &sk_copy->node()->list_node);
         recv_waitq_.notify_one();
     }
-    const size_t old_remote_window_size = remote_window_size_;
-    remote_window_size_ = ntohs(p_in_hdr->window_size);
-    if (ntohs(p_in_hdr->window_size) > old_remote_window_size) {
-        // Notify other thread (if any), that the remote window size has increased
-        send_waitq_.notify_one();
-    }
     arch_irq_restore(flags);
 
-    if (p_in_hdr->flags & TCP_FLAG_PSH || recv_window_size_ == 0) {
+    if (p_in_hdr->flags & TCP_FLAG_PSH || recv_window_size_ == 0 || is_fin) {
         return send_packet(TCP_FLAG_ACK);
     }
     return E_OK;
@@ -289,6 +308,20 @@ void tcp_socket::handle_established_state(sockbuf *data)
         handle_segment(data);
     } else {
         send_packet(TCP_FLAG_RST);
+    }
+}
+
+void tcp_socket::handle_close_wait_state(sockbuf *data)
+{
+    const tcp_header *p_hdr = (tcp_header *)data->header(sockbuf_header_t::tcp);
+    if (p_hdr->flags & TCP_FLAG_RST) {
+        // Remote endpoint closed immediately after sending FIN
+        state_ = TCP_STATE_CLOSED;
+        // Wakeup sending thread to terminate sending
+        send_waitq_.notify_all();
+    } else {
+        // Handle ACKs for data
+        handle_segment(data);
     }
 }
 
@@ -334,6 +367,10 @@ kerror_t tcp_socket::send_segment(sockbuf *data, bool is_last)
     auto flags = arch_irq_save();
     while (remote_window_size_ < data->payload_size()) {
         send_waitq_.wait();
+        if (state_ == TCP_STATE_CLOSED) {
+            arch_irq_restore(flags);
+            return E_PIPE;
+        }
     }
     seq_ += data->payload_size();
     remote_window_size_ -= data->payload_size();
