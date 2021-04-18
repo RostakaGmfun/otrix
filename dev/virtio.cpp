@@ -255,7 +255,7 @@ uint32_t virtio_dev::negotiate_features(uint32_t device_features)
 
 void virtio_dev::init_finished()
 {
-    write_reg(device_status, read_reg(device_status) | virtio_device_status::driver_ok);
+    write_reg(device_status, read_reg(device_status) | virtio_device_status::driver_ok | virtio_device_status::features_ok);
 }
 
 void virtio_dev::handle_vq_irq(void *ctx)
